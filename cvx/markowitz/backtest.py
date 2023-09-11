@@ -17,9 +17,11 @@ def markowitz_problem(n_assets, n_factors):
     exposures = cp.Parameter((n_assets, n_factors))
 
     ### Parameters
-    asset_mean = cp.Parameter(n_assets)
+    idio_mean = cp.Parameter(n_assets)
+    factor_mean = cp.Parameter(n_factors)
+    cash_mean = cp.Parameter()
     factor_covariance_chol = cp.Parameter((n_factors, n_factors))
-    idiosyncratic_vola = cp.Parameter(n_assets)
+    idio_vola = cp.Parameter(n_assets)
 
     rho_mean = cp.Parameter(nonneg=True)
     rho_covariance = cp.Parameter(nonneg=True)
@@ -34,18 +36,31 @@ def markowitz_problem(n_assets, n_factors):
         cp.multiply(exposures@factor_covariance_chol,
                     exposures@factor_covariance_chol
         ), axis=1
-    ) + idiosyncratic_vola**2
+    ) + idio_vola**2
     volas_times_sqrt_rho = cp.CallbackParam(callback=lambda:
                                              variances.value**0.5 * rho_covariance.value**0.5)
+    _abs_weights = cp.Variable(n_assets, nonneg=True)
 
-    risk = cp.norms(
-        cp.hstac(
+
+    risk = cp.norm2(
+        cp.hstack(
             [
                 cp.norm2(factor_covariance_chol@factor_weights),
-                cp.norm2(cp.multiply(idiosyncratic_vola, asset_weights)),
+                cp.norm2(cp.multiply(idio_vola, asset_weights)),
             ]
         )
     )
+
+    risk_wc = cp.norm2(
+        cp.hstack(
+            [
+                risk, 
+                volas_times_sqrt_rho@_abs_weights
+                ]
+        )
+    )
+
+    mean_wc = factor_mean@factor_weights + idio_mean@asset_weights + cash_mean*cash_weight - rho_mean @ cp.abs(asset_weights)
 
 
 
