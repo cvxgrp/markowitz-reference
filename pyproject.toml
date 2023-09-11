@@ -11,25 +11,21 @@ packages = [{include = "cvx"}]
 python = ">=3.9,<3.12"
 numpy = "*"
 pandas = "*"
-quantstats = "*"
-ipython = "*"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
-pytest-cov = "*"
-mock = "*"
 
 [tool.poetry.group.dev.dependencies]
 yfinance = "*"
 plotly = "*"
-cvxpy = "*"
+cvxpy = { git = "https://github.com/cvxpy/cvxpy", branch = "master" }
 loguru = "*"
 
 [tool.poetry.group.stubs.dependencies]
 pandas-stubs = "*"
 
 [tool.mypy]
-files = ["cvx/simulator"]
+files = ["cvx/markowitz"]
 explicit_package_bases = true
 
 [build-system]

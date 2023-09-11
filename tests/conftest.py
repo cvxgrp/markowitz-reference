@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from cvx.simulator.portfolio import EquityPortfolio
+# from cvx.markowitz.portfolio import EquityPortfolio
 
 
 @pytest.fixture(scope="session", name="resource_dir")
@@ -23,11 +23,11 @@ def prices(resource_dir):
     )
 
 
-@pytest.fixture()
-def portfolio(prices):
-    """portfolio fixture"""
-    positions = pd.DataFrame(index=prices.index, columns=prices.columns, data=1.0)
-    return EquityPortfolio(prices, stocks=positions, initial_cash=1e6)
+# @pytest.fixture()
+# def portfolio(prices):
+#     """portfolio fixture"""
+#     positions = pd.DataFrame(index=prices.index, columns=prices.columns, data=1.0)
+#     return EquityPortfolio(prices, stocks=positions, initial_cash=1e6)
 
 
 @pytest.fixture()
