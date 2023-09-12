@@ -7,28 +7,28 @@ ParameterizedProblem = namedtuple("ParameterizedProblem", ["problem", "variables
 
 @dataclass(frozen=True)
 class RiskModel:
-    def __init__(self, factor_covariance, idio_vola, factor_exposures):
+    def __init__(self, factor_covariance, idio_volas, factor_exposures):
         """
         param factor_covariance: dictionary of (n_factors, n_factors) covariance
             matrices, where the keys are the dates
-        param idio_vola: dataframe of idiosyncratic volatilities,
+        param idio_volas: dataframe of idiosyncratic volatilities,
             where columns are assets and rows are the dates
         param factor_exposures: dictionary of factor exposures, where the keys
             are the dates
         """
         # make sure dates align
-        assert set(factor_covariance.keys()) == set(idio_vola.index), \
-            "factor_covariance and idio_vola must have the same dates"
+        assert set(factor_covariance.keys()) == set(idio_volas.index), \
+            "factor_covariance and idio_volas must have the same dates"
         assert set(factor_covariance.keys()) == set(factor_exposures.keys()), \
             "factor_covariance and factor_exposures must have the same dates"
 
         self.factor_covariance = factor_covariance
-        self.idio_vola = idio_vola
+        self.idio_volas = idio_volas
         self.factor_exposures = factor_exposures
         self.times = sorted(factor_covariance.keys())
 
 class Data:
-    def __init__(self, asset_weights_prev, cash_weight_prev, idio_mean, factor_mean, risk_free, factor_covariance, idio_vola, exposures, kappa_short, kappa_brw, kappa_bas, kappa_mi):
+    def __init__(self, asset_weights_prev, cash_weight_prev, idio_mean, factor_mean, risk_free, factor_covariance, idio_volas, exposures, kappa_short, kappa_brw, kappa_bas, kappa_mi):
         """
         param asset_weights_prev: (n_assets,) array of previous asset weights
         param cash_weight_prev: previous cash weight
@@ -37,7 +37,7 @@ class Data:
         param risk_free: risk free rate
         param factor_covariance: (n_factors, n_factors) covariance matrix of
             factor returns
-        param idio_vola: (n_assets,) array of idiosyncratic volatilities
+        param idio_volas: (n_assets,) array of idiosyncratic volatilities
         param exposures: (n_assets, n_factors) array of factor exposures
         param kappa_short: (n_assets,) array of shorting cost
         param kappa_brw: borrowing cost
@@ -51,7 +51,7 @@ class Data:
         self.factor_mean = factor_mean
         self.risk_free = risk_free
         self.factor_covariance = factor_covariance
-        self.idio_vola = idio_vola
+        self.idio_volas = idio_volas
         self.exposures = exposures
         self.kappa_short = kappa_short
         self.kappa_brw = kappa_brw
@@ -136,7 +136,7 @@ class Markowitz:
         factor_mean = cp.Parameter(n_factors, name="factor_mean")
         risk_free = cp.Parameter(name="risk_free")
         factor_covariance_chol = cp.Parameter((n_factors, n_factors), name="factor_covariance_chol")
-        idio_vola = cp.Parameter(n_assets, name="idio_vola")
+        idio_volas = cp.Parameter(n_assets, nonneg=True, name="idio_volas")
         exposures = cp.Parameter((n_assets, n_factors), name="exposures")
         kappa_short = cp.Parameter(n_assets, nonneg=True, name="kappa_short")   
         kappa_brw = cp.Parameter(nonneg=True, name="kappa_brw")
@@ -162,16 +162,25 @@ class Markowitz:
         risk_target = cp.Parameter(nonneg=True, name="risk_target")
 
         ### DPP enabling parameters
-        variances = cp.sum(
-            cp.multiply(exposures@factor_covariance_chol,
-                        exposures@factor_covariance_chol
-            ), axis=1
-        ) + idio_vola**2
+        volas = cp.sum(
+            cp.power(exposures@factor_covariance_chol, 1/2), axis=1) + idio_volas
+        # write vola nicer
+
+        
+        # vola = cp.CallbackParam(callback=lambda:
+        #                         cp.sum(
+        #                             cp.power(exposures@factor_covariance_chol, 1/2), axis=1) + idio_vola,
+        #                          shape=vola.shape, 
+        #                          nonneg=True,
+        #                          name="vola")
+        
+        
         volas_times_sqrt_rho = cp.CallbackParam(callback=lambda:
-                                                variances.value**0.5 * rho_covariance.value**0.5,
-                                                 shape=variances.shape, 
+                                                volas.value * rho_covariance.value**0.5,
+                                                 shape=volas.shape, 
                                                  nonneg=True,
                                                  name="volas_times_sqrt_rho")
+        
         _abs_weights = cp.Variable(n_assets, nonneg=True, name="_abs_weights")
 
 
@@ -181,7 +190,7 @@ class Markowitz:
             cp.hstack(
                 [
                     cp.norm2(factor_covariance_chol@factor_weights),
-                    cp.norm2(cp.multiply(idio_vola, asset_weights)),
+                    cp.norm2(cp.multiply(idio_volas, asset_weights)),
                 ]
             )
         )
