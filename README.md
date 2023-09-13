@@ -1,5 +1,3 @@
-# TODO: UPDATE README
-
 # [cvxsimulator](https://www.cvxgrp.org/simulator/book)
 
 [![PyPI version](https://badge.fury.io/py/cvxsimulator.svg)](https://badge.fury.io/py/cvxsimulator)
