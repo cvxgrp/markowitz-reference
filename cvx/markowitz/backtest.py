@@ -1,9 +1,25 @@
-import pandas as pd
-import cvxpy as cp
-from dataclasses import dataclass
+#    Copyright 2023 Stanford University Convex Optimization Group
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#
+#        http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS,
+#    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#    See the License for the specific language governing permissions and
+#    limitations under the License.
 from collections import namedtuple
+from dataclasses import dataclass
 
-ParameterizedProblem = namedtuple("ParameterizedProblem", ["problem", "variables", "parameters"])
+import cvxpy as cp
+
+ParameterizedProblem = namedtuple(
+    "ParameterizedProblem", ["problem", "variables", "parameters"]
+)
+
 
 @dataclass(frozen=True)
 class RiskModel:
@@ -17,18 +33,35 @@ class RiskModel:
             are the dates
         """
         # make sure dates align
-        assert set(factor_covariance.keys()) == set(idio_volas.index), \
-            "factor_covariance and idio_volas must have the same dates"
-        assert set(factor_covariance.keys()) == set(factor_exposures.keys()), \
-            "factor_covariance and factor_exposures must have the same dates"
+        assert set(factor_covariance.keys()) == set(
+            idio_volas.index
+        ), "factor_covariance and idio_volas must have the same dates"
+        assert set(factor_covariance.keys()) == set(
+            factor_exposures.keys()
+        ), "factor_covariance and factor_exposures must have the same dates"
 
         self.factor_covariance = factor_covariance
         self.idio_volas = idio_volas
         self.factor_exposures = factor_exposures
         self.times = sorted(factor_covariance.keys())
 
+
 class Data:
-    def __init__(self, asset_weights_prev, cash_weight_prev, idio_mean, factor_mean, risk_free, factor_covariance, idio_volas, exposures, kappa_short, kappa_brw, kappa_bas, kappa_mi):
+    def __init__(
+        self,
+        asset_weights_prev,
+        cash_weight_prev,
+        idio_mean,
+        factor_mean,
+        risk_free,
+        factor_covariance,
+        idio_volas,
+        exposures,
+        kappa_short,
+        kappa_brw,
+        kappa_bas,
+        kappa_mi,
+    ):
         """
         param asset_weights_prev: (n_assets,) array of previous asset weights
         param cash_weight_prev: previous cash weight
@@ -42,7 +75,7 @@ class Data:
         param kappa_short: (n_assets,) array of shorting cost
         param kappa_brw: borrowing cost
         param kappa_bas: (n_assets,) array of bid ask spreads
-        param kappa_mi: (n_assets,) array of market impact costs          
+        param kappa_mi: (n_assets,) array of market impact costs
         """
 
         self.asset_weights_prev = asset_weights_prev
@@ -58,8 +91,26 @@ class Data:
         self.kappa_bas = kappa_bas
         self.kappa_mi = kappa_mi
 
+
 class Parameters:
-    def __init__(self, assets_lower, assets_upper, cash_lower, cash_upper, trade_lower, trade_upper, turnover_limit, leverage_limit, rho_mean, rho_covariance, gamma_hold, gamma_trade, gamma_turn, gamma_risk, risk_target):
+    def __init__(
+        self,
+        assets_lower,
+        assets_upper,
+        cash_lower,
+        cash_upper,
+        trade_lower,
+        trade_upper,
+        turnover_limit,
+        leverage_limit,
+        rho_mean,
+        rho_covariance,
+        gamma_hold,
+        gamma_trade,
+        gamma_turn,
+        gamma_risk,
+        risk_target,
+    ):
         """
         param assets_lower: (n_assets,) array of lower bounds on asset weights
         param assets_upper: (n_assets,) array of upper bounds on asset weights
@@ -78,7 +129,7 @@ class Parameters:
         param risk_target: risk target
         """
         self.parameters = {
-            "assets_lower": assets_lower, 
+            "assets_lower": assets_lower,
             "assets_upper": assets_upper,
             "cash_lower": cash_lower,
             "cash_upper": cash_upper,
@@ -92,10 +143,8 @@ class Parameters:
             "gamma_trade": gamma_trade,
             "gamma_turn": gamma_turn,
             "gamma_risk": gamma_risk,
-            "risk_target": risk_target
-            }
-
-
+            "risk_target": risk_target,
+        }
 
         self.assets_lower = assets_lower
         self.assets_upper = assets_upper
@@ -114,16 +163,12 @@ class Parameters:
         self.risk_target = risk_target
 
 
-
 class Markowitz:
-
     def __init__(self, n_assets, n_factors) -> None:
-        
         self.parameterized_problem = self._build(n_assets, n_factors)
 
     @staticmethod
     def _build(n_assets, n_factors):
-
         ### Variables
         asset_weights = cp.Variable(n_assets, name="asset_weights")
         cash_weight = cp.Variable(name="cash_weight")
@@ -135,14 +180,15 @@ class Markowitz:
         idio_mean = cp.Parameter(n_assets, name="idio_mean")
         factor_mean = cp.Parameter(n_factors, name="factor_mean")
         risk_free = cp.Parameter(name="risk_free")
-        factor_covariance_chol = cp.Parameter((n_factors, n_factors), name="factor_covariance_chol")
+        factor_covariance_chol = cp.Parameter(
+            (n_factors, n_factors), name="factor_covariance_chol"
+        )
         idio_volas = cp.Parameter(n_assets, nonneg=True, name="idio_volas")
         exposures = cp.Parameter((n_assets, n_factors), name="exposures")
-        kappa_short = cp.Parameter(n_assets, nonneg=True, name="kappa_short")   
+        kappa_short = cp.Parameter(n_assets, nonneg=True, name="kappa_short")
         kappa_brw = cp.Parameter(nonneg=True, name="kappa_brw")
         kappa_bas = cp.Parameter(n_assets, nonneg=True, name="kappa_bas")
         kappa_mi = cp.Parameter(n_assets, nonneg=True, name="kappa_mi")
-        
 
         ### Parameters
         assets_lower = cp.Parameter(n_assets, name="weights_lower")
@@ -162,56 +208,55 @@ class Markowitz:
         risk_target = cp.Parameter(nonneg=True, name="risk_target")
 
         ### DPP enabling parameters
-        volas = cp.sum(
-            cp.power(exposures@factor_covariance_chol, 1/2), axis=1) + idio_volas
+        volas = (
+            cp.sum(cp.power(exposures @ factor_covariance_chol, 1 / 2), axis=1)
+            + idio_volas
+        )
         # write vola nicer
 
-        
         # vola = cp.CallbackParam(callback=lambda:
         #                         cp.sum(
         #                             cp.power(exposures@factor_covariance_chol, 1/2), axis=1) + idio_vola,
-        #                          shape=vola.shape, 
+        #                          shape=vola.shape,
         #                          nonneg=True,
         #                          name="vola")
-        
-        
-        volas_times_sqrt_rho = cp.CallbackParam(callback=lambda:
-                                                volas.value * rho_covariance.value**0.5,
-                                                 shape=volas.shape, 
-                                                 nonneg=True,
-                                                 name="volas_times_sqrt_rho")
-        
+
+        volas_times_sqrt_rho = cp.CallbackParam(
+            callback=lambda: volas.value * rho_covariance.value**0.5,
+            shape=volas.shape,
+            nonneg=True,
+            name="volas_times_sqrt_rho",
+        )
+
         _abs_weights = cp.Variable(n_assets, nonneg=True, name="_abs_weights")
 
-
         ### Return and risk
-        return_wc = factor_mean@factor_weights + idio_mean@asset_weights + risk_free*cash_weight - rho_mean @ cp.abs(asset_weights)
+        return_wc = (
+            factor_mean @ factor_weights
+            + idio_mean @ asset_weights
+            + risk_free * cash_weight
+            - rho_mean @ cp.abs(asset_weights)
+        )
         risk = cp.norm2(
             cp.hstack(
                 [
-                    cp.norm2(factor_covariance_chol@factor_weights),
+                    cp.norm2(factor_covariance_chol @ factor_weights),
                     cp.norm2(cp.multiply(idio_volas, asset_weights)),
                 ]
             )
         )
 
-        risk_wc = cp.norm2(
-            cp.hstack(
-                [
-                    risk, 
-                    volas_times_sqrt_rho@_abs_weights
-                    ]
-            )
-        )
+        risk_wc = cp.norm2(cp.hstack([risk, volas_times_sqrt_rho @ _abs_weights]))
 
-        
         ### Costs
         trades = asset_weights - asset_weights_prev
-        holding_cost = kappa_short @ cp.pos(-asset_weights) + kappa_brw*cp.pos(-cash_weight)
-        trading_cost = kappa_bas @ cp.abs(trades) + kappa_mi@cp.power(trades, 3/2)
+        holding_cost = kappa_short @ cp.pos(-asset_weights) + kappa_brw * cp.pos(
+            -cash_weight
+        )
+        trading_cost = kappa_bas @ cp.abs(trades) + kappa_mi @ cp.power(trades, 3 / 2)
 
         ### Turnover and leverage
-        turnover = cp.norm1(trades) 
+        turnover = cp.norm1(trades)
         leverage = cp.norm1(asset_weights)
 
         ### Objective
@@ -225,12 +270,12 @@ class Markowitz:
 
         ### Constraints
         constraints = [
-            factor_weights==exposures.T@asset_weights,
+            factor_weights == exposures.T @ asset_weights,
             cp.sum(asset_weights) + cash_weight == 1,
             cash_weight == cash_weight_prev - cp.sum(trades),
             cash_weight >= cash_lower,
             cash_weight <= cash_upper,
-            leverage<=leverage_limit,
+            leverage <= leverage_limit,
             asset_weights >= assets_lower,
             asset_weights <= assets_upper,
             cash_weight >= cash_lower,
@@ -248,19 +293,9 @@ class Markowitz:
             variables=problem.var_dict,
             parameters=problem.param_dict,
         )
-    
+
     def backtest(self, data, parameters):
         for parameter in parameters.keys():
-            self.parameterized_problem.parameters[parameter].value = parameters[parameter]
-
-        
-
-
-
-
-
-
-
-
-
-
+            self.parameterized_problem.parameters[parameter].value = parameters[
+                parameter
+            ]
