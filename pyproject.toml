@@ -4,29 +4,17 @@ version = "0.0.0"
 description = "Simple simulator for investors"
 authors = ["Thomas Schmelzer"]
 readme = "README.md"
-repository = "https://github.com/cvxgrp/simulator"
+repository = "https://github.com/cvxgrp/markowitz-reference"
 packages = [{include = "cvx"}]
 
 [tool.poetry.dependencies]
 python = ">=3.9,<3.12"
 numpy = "*"
 pandas = "*"
+cvxpy = { git = "https://github.com/cvxpy/cvxpy", branch = "master" }
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
-
-[tool.poetry.group.dev.dependencies]
-yfinance = "*"
-plotly = "*"
-cvxpy = { git = "https://github.com/cvxpy/cvxpy", branch = "master" }
-loguru = "*"
-
-[tool.poetry.group.stubs.dependencies]
-pandas-stubs = "*"
-
-[tool.mypy]
-files = ["cvx/markowitz"]
-explicit_package_bases = true
 
 [build-system]
 requires = ["poetry>=1.6.0"]
