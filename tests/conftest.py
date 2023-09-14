@@ -17,5 +17,5 @@ def resource_fixture():
 def prices(resource_dir):
     """prices fixture"""
     return pd.read_csv(
-        resource_dir / "price.csv", index_col=0, parse_dates=True, header=0
+        resource_dir / "prices.csv", index_col=0, parse_dates=True, header=0
     )
