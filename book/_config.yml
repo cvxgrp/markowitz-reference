@@ -16,7 +16,7 @@ parse:
     - dollarmath
   myst_substitutions:
     book_url: https://www.cvxgrp.org/markowitz-reference
-    
+
 # needed for plotly
 sphinx:
   config:
