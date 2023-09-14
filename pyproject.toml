@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "cvxsimulator"
+name = "markowitz-reference"
 version = "0.0.0"
 description = "Simple simulator for investors"
 authors = ["Thomas Schmelzer"]
@@ -12,12 +12,14 @@ python = ">=3.9,<3.12"
 numpy = "*"
 pandas = "*"
 cvxpy = { git = "https://github.com/cvxpy/cvxpy", branch = "master" }
+pybind11 = "*"
 
 [tool.poetry.group.test.dependencies]
-pytest = "*"
+pytest = "7.4.2"
+pytest-cov = "4.1.0"
 
 [build-system]
-requires = ["poetry>=1.6.0"]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
@@ -25,5 +27,7 @@ select = ["E", "F", "I"]
 line-length = 120
 target-version = "py310"
 exclude = [
-    "*__init__.py"
+    "*__init__.py",
+    ".venv",
+    "experiments"
 ]
