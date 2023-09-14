@@ -12,11 +12,9 @@ python = ">=3.9,<3.12"
 numpy = "*"
 pandas = "*"
 cvxpy = { git = "https://github.com/cvxpy/cvxpy", branch = "master" }
-pybind11 = "*"
 
 [tool.poetry.group.test.dependencies]
 pytest = "7.4.2"
-pytest-cov = "4.1.0"
 
 [build-system]
 requires = ["poetry-core"]

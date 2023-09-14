@@ -22,18 +22,6 @@ test: install ## Run tests
 clean:  ## Clean up caches and build artifacts
 	@git clean -X -d -f
 
-.PHONY: coverage
-coverage: ## test and coverage
-	@poetry run coverage run --source=cvx/. -m pytest
-	@poetry run coverage report -m
-	@poetry run coverage html
-
-	@if [ ${UNAME} == "Darwin" ]; then \
-		open htmlcov/index.html; \
-	elif [ ${UNAME} == "linux" ]; then \
-		xdg-open htmlcov/index.html 2> /dev/null; \
-	fi
-
 .PHONY: help
 help:  ## Display this help screen
 	@echo -e "\033[1mAvailable commands:\033[0m"
