@@ -1,7 +1,7 @@
 # Book settings
 # Learn more at https://jupyterbook.org/customize/config.html
 
-title: cvxsimulator
+title: markowitz-reference
 author: Thomas Schmelzer
 only_build_toc_files: true
 
@@ -15,8 +15,8 @@ parse:
     - linkify
     - dollarmath
   myst_substitutions:
-    book_url: https://www.cvxgrp.org/simulator
-
+    book_url: https://www.cvxgrp.org/markowitz-reference
+    
 # needed for plotly
 sphinx:
   config:
@@ -25,7 +25,7 @@ sphinx:
 
 # Information about where the book exists on the web
 repository:
-  url: https://github.com/cvxgrp/simulator
+  url: https://github.com/cvxgrp/markowitz-reference
   path_to_book: book
   branch: main
 

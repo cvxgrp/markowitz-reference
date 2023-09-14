@@ -1,4 +1,4 @@
-# [cvxsimulator](https://www.cvxgrp.org/markowitz-reference/book)
+# [markowitz reference](https://www.cvxgrp.org/markowitz-reference/book)
 
 todo: Write about this project
 
