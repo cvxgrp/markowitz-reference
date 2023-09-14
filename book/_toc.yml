@@ -6,4 +6,3 @@ chapters:
     - file: docs/nb
       sections:
         - glob: docs/notebooks/*
-    - file: docs/reports

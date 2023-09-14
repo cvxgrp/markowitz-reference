@@ -7,11 +7,6 @@ on:
 
 
 jobs:
-  test:
-    runs-on: "ubuntu-latest"
-    steps:
-      - uses: cvxgrp/.github/actions/test@main
-
   jupyter:
     runs-on: "ubuntu-latest"
     steps:
@@ -19,7 +14,7 @@ jobs:
 
   book:
     runs-on: "ubuntu-latest"
-    needs: [test, jupyter]
+    needs: [jupyter]
 
     permissions:
       contents: write
