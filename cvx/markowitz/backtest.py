@@ -162,8 +162,12 @@ class Markowitz:
         risk_target = cp.Parameter(nonneg=True, name="risk_target")
 
         ### DPP enabling parameters
-        volas = cp.sum(
-            cp.power(exposures@factor_covariance_chol, 1/2), axis=1) + idio_volas
+        volas = cp.sqrt(
+            cp.sum(
+                cp.power(
+                    exposures @ factor_covariance_chol,2
+                    ),
+                      axis=1)) + idio_volas
         # write vola nicer
 
         
