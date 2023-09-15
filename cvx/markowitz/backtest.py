@@ -212,14 +212,6 @@ class Markowitz:
             cp.sqrt(cp.sum(cp.power(exposures @ factor_covariance_chol, 2), axis=1))
             + idio_volas
         )
-        # write vola nicer
-
-        # vola = cp.CallbackParam(callback=lambda:
-        #                         cp.sum(
-        #                             cp.power(exposures@factor_covariance_chol, 1/2), axis=1) + idio_vola,
-        #                          shape=vola.shape,
-        #                          nonneg=True,
-        #                          name="vola")
 
         volas_times_sqrt_rho = cp.CallbackParam(
             callback=lambda: volas.value * rho_covariance.value**0.5,
