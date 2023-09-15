@@ -1,4 +1,4 @@
-# [markowitz reference](https://www.cvxgrp.org/markowitz-reference/book)
+# markowitz reference
 
 todo: Write about this project
 
