@@ -1,25 +1,9 @@
-# [markowitz reference](https://www.cvxgrp.org/markowitz-reference/book)
+## Markowitz Reference Implementation
 
-todo: Write about this project
+This repository accompanies the paper \cite{X}. It contains a reference implementation of the Markowitz portfolio optimization problem and the data used in the paper.
 
-## Poetry
-
-We assume you share already the love for [Poetry](https://python-poetry.org).
-Once you have installed poetry you can perform
+To replicate the results of the paper, install the dependencies in `requirements.txt` and run
 
 ```bash
-make install
+python markowitz.py
 ```
-
-to replicate the virtual environment we have defined in pyproject.toml.
-
-## Jupyter
-
-We install [JupyterLab](https://jupyter.org) on fly within the aforementioned
-virtual environment. Executing
-
-```bash
-make jupyter
-```
-
-will install and start the jupyter lab.

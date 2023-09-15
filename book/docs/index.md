@@ -1,1 +1,0 @@
-# Mosek reference
