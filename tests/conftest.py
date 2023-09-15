@@ -2,8 +2,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-
-import pandas as pd
 import pytest
 
 
@@ -11,11 +9,3 @@ import pytest
 def resource_fixture():
     """resource fixture"""
     return Path(__file__).parent / "resources"
-
-
-@pytest.fixture()
-def prices(resource_dir):
-    """prices fixture"""
-    return pd.read_csv(
-        resource_dir / "prices.csv", index_col=0, parse_dates=True, header=0
-    )
