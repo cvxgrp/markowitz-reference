@@ -23,6 +23,10 @@ test: install ## Run tests
 clean:  ## Clean up caches and build artifacts
 	@git clean -X -d -f
 
+.PHONY: experiment
+experiment: install ## Run all experiment
+	${VENV}/bin/python experiments.py
+
 .PHONY: help
 help:  ## Display this help screen
 	@echo -e "\033[1mAvailable commands:\033[0m"
