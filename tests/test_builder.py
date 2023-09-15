@@ -1,6 +1,12 @@
 # """
 # testing the builder
 # """
+
+# import sys
+# from pathlib import Path
+#
+# sys.path.append(Path(__file__).parent.parent / "cvx")
+
 from cvx.markowitz.backtest import ParameterizedProblem
 
 

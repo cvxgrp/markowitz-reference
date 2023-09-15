@@ -1,22 +1,23 @@
 .DEFAULT_GOAL := help
 
-SHELL=/bin/bash
-
-UNAME=$(shell uname -s)
+VENV :=.venv
 
 .PHONY: install
 install:  ## Install a virtual environment
-	@poetry install -vv
+	python -m venv ${VENV}
+	${VENV}/bin/pip install --upgrade pip
+	${VENV}/bin/pip install -r requirements.txt
 
 .PHONY: fmt
-fmt:  ## Run autoformatting and linting
-	@poetry run pip install pre-commit
-	@poetry run pre-commit install
-	@poetry run pre-commit run --all-files
+fmt: install ## Run autoformatting and linting
+	${VENV}/bin/pip install pre-commit
+	${VENV}/bin/pre-commit install
+	${VENV}/bin/pre-commit run --all-files
 
 .PHONY: test
 test: install ## Run tests
-	@poetry run pytest
+	${VENV}/bin/pip install pytest
+	${VENV}/bin/pytest tests
 
 .PHONY: clean
 clean:  ## Clean up caches and build artifacts
