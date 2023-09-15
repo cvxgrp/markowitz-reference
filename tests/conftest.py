@@ -9,3 +9,9 @@ import pytest
 def resource_fixture():
     """resource fixture"""
     return Path(__file__).parent / "resources"
+
+
+@pytest.fixture(scope="session", name="data_dir")
+def data_fixture():
+    """resource fixture"""
+    return Path(__file__).parent.parent / "data"
