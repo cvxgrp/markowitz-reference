@@ -52,7 +52,7 @@ class Parameters:
     gamma_trade: float  # trading cost
     gamma_turn: float  # turnover cost
     gamma_risk: float  # risk cost
-    risk_target: float  # risk target
+    risk_target: float  # risk target as volatility
 
 
 def markowitz(data: Data, param: Parameters) -> tuple[np.ndarray, float]:
