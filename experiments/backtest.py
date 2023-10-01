@@ -80,7 +80,7 @@ def run_backtest(strategy: Callable, risk_target: float, verbose: bool = False) 
     
     post_trade_cash = pd.Series(post_trade_cash, index=prices.index[lookback:])
     post_trade_quantities = pd.DataFrame(post_trade_quantities, index=prices.index[lookback:], columns=prices.columns)
-    return BacktestResult(post_trade_cash, post_trade_quantities)
+    return BacktestResult(post_trade_cash, post_trade_quantities, risk_target)
 
 
 def create_orders(w, quantities, cash, latest_prices) -> np.array:
@@ -114,6 +114,7 @@ def interest_and_fees(cash, quantities) -> float:
 class BacktestResult:
     cash: pd.Series
     quantities: pd.DataFrame
+    risk_target: float
 
     @property
     def valuations(self):
@@ -161,6 +162,10 @@ class BacktestResult:
         return self.portfolio_value.div(self.portfolio_value.cummax()).sub(1).min()
     
     @property
+    def max_leverage(self) -> float:
+        return self.asset_weights.abs().sum(axis=1).max()
+
+    @property
     def sharpe(self) -> float:
         return self.mean_return / self.volatility   # TODO: risk free rate
     
@@ -169,7 +174,7 @@ class BacktestResult:
             pickle.dump(self, f, pickle.HIGHEST_PROTOCOL)
 
     @staticmethod
-    def load(path: Path):
+    def load(path: Path) -> "BacktestResult":
         with open(path, "rb") as f:
             return pickle.load(f)
 
@@ -179,4 +184,4 @@ if __name__ == "__main__":
     n_assets = load_data()[0].shape[1]
     w_targets = np.ones(n_assets) / (n_assets + 1)
     c_target = 1 / (n_assets + 1)
-    run_backtest(lambda _inputs: (w_targets, c_target), risk_target=0.1, verbose=True)
+    run_backtest(lambda _inputs: (w_targets, c_target), risk_target=0.0, verbose=True)
