@@ -1,2 +1,4 @@
 cvxpy
 numpy
+pandas
+matplotlib
