@@ -3,14 +3,13 @@ import numpy as np
 import pandas as pd
 import cvxpy as cp
 from backtest import BacktestResult, OptimizationInput, run_backtest
-from markowitz import Parameters
+from markowitz import Data, Parameters
 import matplotlib.pyplot as plt
 
 
 def unconstrained_markowitz(inputs: OptimizationInput) -> np.ndarray:
     """Compute the unconstrained Markowitz portfolio weights."""
     n_assets = inputs.prices.shape[1]
-    # mu, Sigma = ewma_mean_covariance(inputs.prices)
 
     mu, Sigma = inputs.mean.values, inputs.covariance.values
 
@@ -21,8 +20,7 @@ def unconstrained_markowitz(inputs: OptimizationInput) -> np.ndarray:
     chol = np.linalg.cholesky(Sigma)
     constraints = [
         cp.sum(w) + c == 1,
-        # cp.quad_form(w, Sigma, assume_PSD=True) <= inputs.risk_target ** 2
-        cp.norm2(chol @ w) <= inputs.risk_target,  # faster in my experience
+        cp.norm2(chol @ w) <= inputs.risk_target,
     ]
     problem = cp.Problem(cp.Maximize(objective), constraints)
     problem.solve(get_solver())
@@ -33,7 +31,6 @@ def unconstrained_markowitz(inputs: OptimizationInput) -> np.ndarray:
 def long_only_markowitz(inputs: OptimizationInput) -> np.ndarray:
     """Compute the long-only Markowitz portfolio weights."""
     n_assets = inputs.prices.shape[1]
-    # mu, Sigma = ewma_mean_covariance(inputs.prices)
 
     mu, Sigma = inputs.mean.values, inputs.covariance.values
 
@@ -58,31 +55,44 @@ def equal_weights(inputs: OptimizationInput) -> np.ndarray:
     return w, c
 
 
-# def prepare_data(
-#
-# prices: pd.DataFrame, spread:
-#  pd.DataFrame, volume: pd.DataFrame, quantities: np.ndarray, cash: float
-#     ) -> Data:
-#     n_assets = prices.shape[1]
-#     latest_prices = prices.iloc[-1]
-#     portfolio_value = cash + quantities @ latest_prices
+def ewma_mean_covariance(
+    prices: pd.DataFrame, lamb: float = 0.94
+) -> tuple[np.ndarray, np.ndarray]:
+    returns = prices.pct_change().dropna()
+    n_assets = returns.shape[1]
+    alpha = 1 - lamb
+    mu = returns.ewm(alpha=alpha).mean().iloc[-1].values
+    Sigma = returns.ewm(alpha=alpha).cov().iloc[-n_assets:].values
+    return mu, Sigma
 
-#     mu, Sigma = ewma_mean_covariance(prices)
 
-#     return Data(
-#         w_prev = quantities * latest_prices / portfolio_value,
-#         c_prev = cash / portfolio_value,
-#         idio_mean = mu,
-#         factor_mean = np.zeros(n_assets),
-#         risk_free = 0,
-#         factor_covariance_chol = np.linalg.cholesky(Sigma),
-#         idio_volas = np.sqrt(np.diag(Sigma)),
-#         F = np.eye(n_assets),
-#         kappa_short = np.zeros(n_assets),
-#         kappa_borrow = 0.0,
-#         kappa_spread = np.zeros(n_assets),
-#         kappa_impact = np.zeros(n_assets),
-#     )
+def prepare_data(
+    prices: pd.DataFrame,
+    spread: pd.DataFrame,
+    volume: pd.DataFrame,
+    quantities: np.ndarray,
+    cash: float,
+) -> Data:
+    n_assets = prices.shape[1]
+    latest_prices = prices.iloc[-1]
+    portfolio_value = cash + quantities @ latest_prices
+
+    mu, Sigma = ewma_mean_covariance(prices)
+
+    return Data(
+        w_prev=quantities * latest_prices / portfolio_value,
+        c_prev=cash / portfolio_value,
+        idio_mean=mu,
+        factor_mean=np.zeros(n_assets),
+        risk_free=0,
+        factor_covariance_chol=np.linalg.cholesky(Sigma),
+        idio_volas=np.sqrt(np.diag(Sigma)),
+        F=np.eye(n_assets),
+        kappa_short=np.zeros(n_assets),
+        kappa_borrow=0.0,
+        kappa_spread=np.zeros(n_assets),
+        kappa_impact=np.zeros(n_assets),
+    )
 
 
 def get_parameters(data, risk_target):

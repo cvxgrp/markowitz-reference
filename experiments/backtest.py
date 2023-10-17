@@ -148,12 +148,12 @@ class BacktestResult:
     risk_target: float
 
     @property
-    def valuations(self):
+    def valuations(self) -> pd.DataFrame:
         prices = load_data()[0].loc[self.history]
         return self.quantities * prices
 
     @property
-    def portfolio_value(self):
+    def portfolio_value(self) -> pd.Series:
         return self.cash + self.valuations.sum(axis=1)
 
     @property
