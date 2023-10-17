@@ -18,9 +18,7 @@ def data_folder():
 @lru_cache(maxsize=1)
 def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     prices = pd.read_csv(data_folder() / "prices.csv", index_col=0, parse_dates=True)
-    spread = pd.read_csv(
-        data_folder() / "spreads.csv", index_col=0, parse_dates=True
-    ).fillna(0.10)
+    spread = pd.read_csv(data_folder() / "spreads.csv", index_col=0, parse_dates=True)
     volume = pd.read_csv(data_folder() / "volumes.csv", index_col=0, parse_dates=True)
     return prices, spread, volume
 
@@ -105,8 +103,8 @@ def execute_orders(latest_prices, trade_quantities, latest_spread) -> float:
     sell_order_quantities = np.clip(trade_quantities, None, 0)
     buy_order_quantities = np.clip(trade_quantities, 0, None)
 
-    sell_order_prices = latest_prices * (1 - latest_spread / 2 / 100)
-    buy_order_prices = latest_prices * (1 + latest_spread / 2 / 100)
+    sell_order_prices = latest_prices * (1 - latest_spread / 2)
+    buy_order_prices = latest_prices * (1 + latest_spread / 2)
 
     sell_receipt = -sell_order_quantities @ sell_order_prices
     buy_payment = buy_order_quantities @ buy_order_prices
