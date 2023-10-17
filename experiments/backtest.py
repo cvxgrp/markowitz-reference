@@ -59,7 +59,7 @@ def run_backtest(strategy: Callable, risk_target: float, verbose: bool = False) 
         if verbose:
             print(f"Day {day} of {len(prices)-1}, {prices.index[day]}")
 
-        prices_t = prices.iloc[day-lookback:day]  # Up to t-1
+        prices_t = prices.iloc[day-lookback:day] # Up to t-1
         spread_t = spread.iloc[day-lookback:day]
         volume_t = volume.iloc[day-lookback:day]
 
@@ -117,12 +117,12 @@ class BacktestResult:
     risk_target: float
 
     @property
-    def valuations(self):
+    def valuations(self) -> pd.DataFrame:
         prices = load_data()[0].loc[self.history]
         return self.quantities * prices
     
     @property
-    def portfolio_value(self):
+    def portfolio_value(self) -> pd.Series:
         return self.cash + self.valuations.sum(axis=1)
     
     @property
