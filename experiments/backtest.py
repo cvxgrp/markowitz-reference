@@ -32,6 +32,8 @@ class OptimizationInput:
     """
 
     prices: pd.DataFrame
+    mean: pd.Series
+    covariance: pd.DataFrame
     spread: pd.DataFrame
     volume: pd.DataFrame
     quantities: np.ndarray
@@ -60,17 +62,37 @@ def run_backtest(
     post_trade_cash = []
     post_trade_quantities = []
 
+    returns = prices.pct_change().dropna()
+    means = returns.ewm(halflife=125).mean()
+    covariance_df = returns.ewm(halflife=125).cov()
+    times = returns.index
+    covariances = {}
+    for time in times:
+        covariances[time] = covariance_df.loc[time]
+
     for day in range(lookback, len(prices)):
         if verbose:
             print(f"Day {day} of {len(prices)-1}, {prices.index[day]}")
 
+        time = prices.index[day]
+
         prices_t = prices.iloc[day - lookback : day]  # Up to t-1
+        mean_t = means.loc[time]
+        covariance_t = covariances[time]
         spread_t = spread.iloc[day - lookback : day]
         volume_t = volume.iloc[day - lookback : day]
 
         inputs_t = OptimizationInput(
-            prices_t, spread_t, volume_t, quantities, cash, risk_target
+            prices_t,
+            mean_t,
+            covariance_t,
+            spread_t,
+            volume_t,
+            quantities,
+            cash,
+            risk_target,
         )
+
         w, _ = strategy(inputs_t)
 
         latest_prices = prices.iloc[day]  # At t
