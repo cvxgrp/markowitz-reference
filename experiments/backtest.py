@@ -16,11 +16,12 @@ def data_folder():
 
 
 @lru_cache(maxsize=1)
-def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     prices = pd.read_csv(data_folder() / "prices.csv", index_col=0, parse_dates=True)
     spread = pd.read_csv(data_folder() / "spreads.csv", index_col=0, parse_dates=True)
     volume = pd.read_csv(data_folder() / "volumes.csv", index_col=0, parse_dates=True)
-    return prices, spread, volume
+    rf = pd.read_csv(data_folder() / "rf.csv", index_col=0, parse_dates=True).iloc[:, 0]
+    return prices, spread, volume, rf
 
 
 @dataclass
@@ -49,7 +50,7 @@ def run_backtest(
     We then trade to these weights at time t.
     """
 
-    prices, spread, volume = load_data()
+    prices, spread, volume, rf = load_data()
     n_assets = prices.shape[1]
 
     lookback = 500
@@ -63,22 +64,22 @@ def run_backtest(
     returns = prices.pct_change().dropna()
     means = returns.ewm(halflife=125).mean()
     covariance_df = returns.ewm(halflife=125).cov()
-    times = returns.index
+    days = returns.index
     covariances = {}
-    for time in times:
-        covariances[time] = covariance_df.loc[time]
+    for day in days:
+        covariances[day] = covariance_df.loc[day]
 
-    for day in range(lookback, len(prices)):
+    for t in range(lookback, len(prices)):
+        day = prices.index[t]
+
         if verbose:
-            print(f"Day {day} of {len(prices)-1}, {prices.index[day]}")
+            print(f"Day {t} of {len(prices)-1}, {day}")
 
-        time = prices.index[day]
-
-        prices_t = prices.iloc[day - lookback : day]  # Up to t-1
-        mean_t = means.loc[time]
-        covariance_t = covariances[time]
-        spread_t = spread.iloc[day - lookback : day]
-        volume_t = volume.iloc[day - lookback : day]
+        prices_t = prices.iloc[t - lookback : t]  # Up to t-1
+        spread_t = spread.iloc[t - lookback : t]
+        volume_t = volume.iloc[t - lookback : t]
+        mean_t = means.loc[day]
+        covariance_t = covariances[day]
 
         inputs_t = OptimizationInput(
             prices_t,
@@ -93,10 +94,12 @@ def run_backtest(
 
         w, _ = strategy(inputs_t)
 
-        latest_prices = prices.iloc[day]  # At t
-        latest_spread = spread.iloc[day]
+        latest_prices = prices.iloc[t]  # At t
+        latest_spread = spread.iloc[t]
 
-        cash += interest_and_fees(cash, quantities)
+        cash += interest_and_fees(
+            cash, rf.iloc[t - 1], quantities, prices.iloc[t - 1], day
+        )
         trade_quantities = create_orders(w, quantities, cash, latest_prices)
         quantities += trade_quantities
         cash += execute_orders(latest_prices, trade_quantities, latest_spread)
@@ -134,9 +137,26 @@ def execute_orders(latest_prices, trade_quantities, latest_spread) -> float:
     return sell_receipt - buy_payment
 
 
-def interest_and_fees(cash, quantities) -> float:
-    # TODO: add risk free rate, borrow rate, shorting fees
-    return 0
+def interest_and_fees(
+    cash: float, rf: float, quantities: pd.Series, prices: pd.Series, day: pd.Timestamp
+) -> float:
+    """
+    From t-1 to t we either earn interest on cash or pay interest on borrowed cash.
+    We also pay a fee for shorting (stark simplification: using the same rate).
+
+    cash: cash at t-1
+    rf: risk free rate from t-1 to t
+    quantities: quantities at t-1
+    prices: prices at t-1
+    day: day t
+    Note on rf: the Effective Federal Funds Rate uses ACT/360.
+    """
+    days_t_to_t_minus_1 = (day - prices.name).days
+    cash_interest = cash * (1 + rf) ** days_t_to_t_minus_1 - cash
+    short_valuations = np.clip(quantities, None, 0) * prices
+    short_value = short_valuations.sum()
+    shorting_fee = short_value * (1 + rf) ** days_t_to_t_minus_1 - short_value
+    return cash_interest + shorting_fee
 
 
 @dataclass
