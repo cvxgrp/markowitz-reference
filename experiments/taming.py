@@ -20,7 +20,7 @@ def unconstrained_markowitz(inputs: OptimizationInput) -> np.ndarray:
     chol = np.linalg.cholesky(Sigma)
     constraints = [
         cp.sum(w) + c == 1,
-        cp.norm2(chol @ w) <= inputs.risk_target,
+        cp.norm2(chol.T @ w) <= inputs.risk_target,
     ]
     problem = cp.Problem(cp.Maximize(objective), constraints)
     problem.solve(get_solver())
