@@ -19,7 +19,7 @@ def unconstrained_markowitz(inputs: OptimizationInput) -> np.ndarray:
 
     chol = np.transpose(np.linalg.cholesky(Sigma))
     # chol should now be an upper triangular matrix
-    
+
     constraints = [
         cp.sum(w) + c == 1,
         cp.norm2(chol @ w) <= inputs.risk_target,
