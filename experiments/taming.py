@@ -40,25 +40,6 @@ def long_only_markowitz(inputs: OptimizationInput) -> np.ndarray:
     return unconstrained_markowitz(inputs, long_only=True)
 
 
-# def long_only_markowitz(inputs: OptimizationInput) -> np.ndarray:
-#     """Compute the long-only Markowitz portfolio weights."""
-#     n_assets = inputs.prices.shape[1]
-
-#     mu, Sigma = inputs.mean.values, inputs.covariance.values
-
-#     w = cp.Variable(n_assets, nonneg=True)
-#     c = cp.Variable(nonneg=True)
-#     objective = mu @ w
-#     constraints = [
-#         cp.sum(w) + c == 1,
-#         cp.quad_form(w, Sigma, assume_PSD=True) <= inputs.risk_target**2,
-#     ]
-#     problem = cp.Problem(cp.Maximize(objective), constraints)
-#     problem.solve(get_solver())
-#     assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}
-#     return w.value, c.value
-
-
 def equal_weights(inputs: OptimizationInput) -> np.ndarray:
     """Compute the equal weights portfolio."""
     n_assets = inputs.prices.shape[1]
