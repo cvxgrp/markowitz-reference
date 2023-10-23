@@ -6,6 +6,7 @@ import sys
 from typing import Callable
 import numpy as np
 import pandas as pd
+from utils import synthetic_returns
 
 # hack to allow importing from parent directory without having a package
 sys.path.append(str(Path(__file__).parent.parent))
@@ -61,7 +62,7 @@ def run_backtest(
     post_trade_cash = []
     post_trade_quantities = []
 
-    returns = prices.pct_change().dropna()
+    returns = synthetic_returns(prices).dropna()
     means = returns.ewm(halflife=125).mean()
     covariance_df = returns.ewm(halflife=125).cov()
     days = returns.index
