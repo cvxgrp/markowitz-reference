@@ -46,9 +46,8 @@ def run_backtest(
 ) -> tuple[pd.Series, pd.DataFrame]:
     """
     Run a simplified backtest for a given strategy.
-    At time t we use data from t-500 to t-1 to forecast the data and
-    compute the optimal portfolio weights and cash holdings.
-    We then trade to these weights at time t.
+    At time t we use data from t-lookback to t to compute the optimal portfolio
+    weights and then execute the trades at time t.
     """
 
     prices, spread, volume, rf = load_data()
@@ -62,25 +61,28 @@ def run_backtest(
     post_trade_cash = []
     post_trade_quantities = []
 
-    returns = synthetic_returns(prices).dropna()
-    means = returns.ewm(halflife=125).mean()
-    covariance_df = returns.ewm(halflife=125).cov()
+    returns = prices.pct_change().dropna()
+    means = (
+        synthetic_returns(prices).shift(-1).dropna()
+    )  # At time t includes data up to t+1
+    covariance_df = returns.ewm(halflife=125).cov()  # At time t includes data up to t
     days = returns.index
     covariances = {}
     for day in days:
         covariances[day] = covariance_df.loc[day]
 
-    for t in range(lookback, len(prices)):
+    for t in range(lookback, len(prices) - 1):
         day = prices.index[t]
 
         if verbose:
             print(f"Day {t} of {len(prices)-1}, {day}")
 
-        prices_t = prices.iloc[t - lookback : t]  # Up to t-1
-        spread_t = spread.iloc[t - lookback : t]
-        volume_t = volume.iloc[t - lookback : t]
-        mean_t = means.loc[day]
-        covariance_t = covariances[day]
+        prices_t = prices.iloc[t - lookback : t + 1]  # Up to t
+        spread_t = spread.iloc[t - lookback : t + 1]
+        volume_t = volume.iloc[t - lookback : t + 1]
+
+        mean_t = means.loc[day]  # Forecast for return t to t+1
+        covariance_t = covariances[day]  # Forecast for covariance t to t+1
 
         inputs_t = OptimizationInput(
             prices_t,
@@ -108,9 +110,9 @@ def run_backtest(
         post_trade_cash.append(cash)
         post_trade_quantities.append(quantities)
 
-    post_trade_cash = pd.Series(post_trade_cash, index=prices.index[lookback:])
+    post_trade_cash = pd.Series(post_trade_cash, index=prices.index[lookback:-1])
     post_trade_quantities = pd.DataFrame(
-        post_trade_quantities, index=prices.index[lookback:], columns=prices.columns
+        post_trade_quantities, index=prices.index[lookback:-1], columns=prices.columns
     )
     return BacktestResult(post_trade_cash, post_trade_quantities, risk_target)
 
@@ -236,4 +238,13 @@ if __name__ == "__main__":
     n_assets = load_data()[0].shape[1]
     w_targets = np.ones(n_assets) / (n_assets + 1)
     c_target = 1 / (n_assets + 1)
-    run_backtest(lambda _inputs: (w_targets, c_target), risk_target=0.0, verbose=True)
+    result = run_backtest(
+        lambda _inputs: (w_targets, c_target), risk_target=0.0, verbose=True
+    )
+    print(
+        f"Mean return: {result.mean_return:.2%},\n"
+        f"Volatility: {result.volatility:.2%},\n"
+        f"Sharpe: {result.sharpe:.2f},\n"
+        f"Turnover: {result.turnover:.2f},\n"
+        f"Max leverage: {result.max_leverage:.2f}"
+    )

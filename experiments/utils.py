@@ -1,7 +1,10 @@
 import numpy as np
+import pandas as pd
 
 
-def synthetic_returns(prices, var_r=0.0005, var_eps=0.02):
+def synthetic_returns(
+    prices: pd.DataFrame, var_r: float = 0.0005, var_eps: float = 0.02
+) -> pd.DataFrame:
     """
     param prices: a DataFrame of prices
     param var_r: the Gaussian variance of the returns
@@ -19,4 +22,7 @@ def synthetic_returns(prices, var_r=0.0005, var_eps=0.02):
 
     alpha = var_r / (var_r + var_eps)
     sigma_eps = np.sqrt(var_eps)
-    return alpha * (returns + np.random.normal(size=returns.shape) * sigma_eps)
+    synthetic_returns = alpha * (
+        returns + np.random.normal(size=returns.shape) * sigma_eps
+    )
+    return synthetic_returns
