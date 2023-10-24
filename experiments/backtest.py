@@ -199,6 +199,9 @@ class BacktestResult:
 
     @property
     def turnover(self) -> float:
+        """
+        Note that turnover here includes weight changes due to price changes.
+        """
         return (
             self.asset_weights.diff().abs().sum(axis=1).mean() * self.periods_per_year
         )
