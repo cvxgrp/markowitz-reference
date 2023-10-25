@@ -1,4 +1,3 @@
-import logging
 import os
 import numpy as np
 import pandas as pd
@@ -29,21 +28,11 @@ def unconstrained_markowitz(
         cp.sum(w) + c == 1,
         cp.norm2(chol.T @ w) <= inputs.risk_target,
     ]
-    if not long_only:
-        constraints.append(c == 0)
 
     problem = cp.Problem(cp.Maximize(objective), constraints)
     problem.solve(get_solver())
-    if problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}:
-        return w.value, c.value
-    else:
-        cash = inputs.cash
-        quantities = inputs.quantities
-        portfolio_value = cash + quantities @ inputs.prices.iloc[-1]
-        valuations = quantities * inputs.prices.iloc[-1]
-        w, c = valuations / portfolio_value, cash / portfolio_value
-        logging.warning(f"Problem status: {problem.status}, returning previous weights")
-        return w, c
+    assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
+    return w.value, c.value
 
 
 def long_only_markowitz(inputs: OptimizationInput) -> np.ndarray:
