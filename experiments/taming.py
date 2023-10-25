@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 def unconstrained_markowitz(
     inputs: OptimizationInput, long_only: bool = False
 ) -> np.ndarray:
-    """Compute the unconstrained Markowitz portfolio weights."""
+    """Compute the unconstrained (or long-only) Markowitz portfolio weights."""
     n_assets = inputs.prices.shape[1]
 
     mu, Sigma = inputs.mean.values, inputs.covariance.values
@@ -31,7 +31,7 @@ def unconstrained_markowitz(
 
     problem = cp.Problem(cp.Maximize(objective), constraints)
     problem.solve(get_solver())
-    assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}
+    assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
     return w.value, c.value
 
 
@@ -110,86 +110,60 @@ def get_parameters(data, risk_target):
 
 def main(from_checkpoint: bool = False):
     if from_checkpoint:
-        unconstrained_results = []
-        for f in [
+        unconstrained_files = [
             f for f in os.listdir("checkpoints") if f.startswith("unconstrained")
-        ]:
-            unconstrained_results.append(BacktestResult.load(f"checkpoints/{f}"))
+        ]
+        assert len(unconstrained_files) == 1
+        unconstrained_result = BacktestResult.load(
+            f"checkpoints/{unconstrained_files[0]}"
+        )
+
+        long_only_files = [
+            f for f in os.listdir("checkpoints") if f.startswith("long_only")
+        ]
+        assert len(long_only_files) == 1
+        long_only_result = BacktestResult.load(f"checkpoints/{long_only_files[0]}")
+
         equal_weights_results = BacktestResult.load("checkpoints/equal_weights.pickle")
     else:
         equal_weights_results = run_backtest(equal_weights, 0.0, verbose=True)
         equal_weights_results.save("checkpoints/equal_weights.pickle")
 
         adjustment_factor = np.sqrt(equal_weights_results.periods_per_year)
-        sigma_targets = np.array([0.10]) / adjustment_factor
-        unconstrained_results = []
-        for sigma_target in sigma_targets:
-            result = run_backtest(unconstrained_markowitz, sigma_target, verbose=True)
-            result.save(
-                f"checkpoints/unconstrained_{result.risk_target * adjustment_factor:.2f}.pickle"
-            )
-            unconstrained_results.append(result)
+        annualized_target = 0.13
+        sigma_target = annualized_target / adjustment_factor
 
-        long_only_results = []
-        for sigma_target in sigma_targets:
-            result = run_backtest(long_only_markowitz, sigma_target, verbose=True)
-            result.save(
-                f"checkpoints/long_only_{result.risk_target * adjustment_factor:.2f}.pickle"
-            )
-            long_only_results.append(result)
+        unconstrained_result = run_backtest(
+            unconstrained_markowitz, sigma_target, verbose=True
+        )
+        unconstrained_result.save(
+            f"checkpoints/unconstrained_{annualized_target}.pickle"
+        )
 
-    generate_table(equal_weights_results, unconstrained_results, long_only_results)
-    plot_results(equal_weights_results, unconstrained_results, long_only_results)
+        long_only_result = run_backtest(long_only_markowitz, sigma_target, verbose=True)
+        long_only_result.save(f"checkpoints/long_only_{annualized_target}.pickle")
+
+    generate_table(equal_weights_results, unconstrained_result, long_only_result)
+    # plot_results(equal_weights_results, unconstrained_result, long_only_result)
 
 
 def generate_table(
     equal_weights_results: BacktestResult,
-    unconstrained_results: list[BacktestResult],
-    long_only_results: list[BacktestResult],
+    unconstrained_results: BacktestResult,
+    long_only_results: BacktestResult,
 ) -> None:
     # Table 1
     df = pd.DataFrame(
-        index=["Equal weights"]
-        + [
-            f"$\\sigma^\\text{{tar}} = {result.risk_target:.2f}$"
-            for result in unconstrained_results
-        ],
+        index=["Equal weights", "Unconstrained Markowitz", "Long-only Markowitz"],
         columns=["Mean return", "Volatility", "Sharpe", "Turnover", "Max leverage"],
     )
-    df["Mean return"] = [equal_weights_results.mean_return] + [
-        result.mean_return for result in unconstrained_results
-    ]
-    df["Volatility"] = [equal_weights_results.volatility] + [
-        result.volatility for result in unconstrained_results
-    ]
-    df["Sharpe"] = [equal_weights_results.sharpe] + [
-        result.sharpe for result in unconstrained_results
-    ]
-    df["Turnover"] = [equal_weights_results.turnover] + [
-        result.turnover for result in unconstrained_results
-    ]
-    df["Max leverage"] = [
-        equal_weights_results.asset_weights.abs().sum(axis=1).max()
-    ] + [
-        result.asset_weights.abs().sum(axis=1).max() for result in unconstrained_results
-    ]
-    print(df.to_latex(float_format="%.2f"))
+    strategies = [equal_weights_results, unconstrained_results, long_only_results]
 
-    # Table 2
-    df = pd.DataFrame(
-        index=[
-            f"$\\sigma^\\text{{tar}} = {result.risk_target:.2f}$"
-            for result in long_only_results
-        ],
-        columns=["Mean return", "Volatility", "Sharpe", "Turnover", "Max leverage"],
-    )
-    df["Mean return"] = [result.mean_return for result in long_only_results]
-    df["Volatility"] = [result.volatility for result in long_only_results]
-    df["Sharpe"] = [result.sharpe for result in long_only_results]
-    df["Turnover"] = [result.turnover for result in long_only_results]
-    df["Max leverage"] = [
-        result.asset_weights.abs().sum(axis=1).max() for result in long_only_results
-    ]
+    df["Mean return"] = [result.mean_return for result in strategies]
+    df["Volatility"] = [result.volatility for result in strategies]
+    df["Sharpe"] = [result.sharpe for result in strategies]
+    df["Turnover"] = [result.turnover for result in strategies]
+    df["Max leverage"] = [result.max_leverage for result in strategies]
     print(df.to_latex(float_format="%.2f"))
 
 
