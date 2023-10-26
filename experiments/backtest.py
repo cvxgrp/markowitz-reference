@@ -40,6 +40,10 @@ class OptimizationInput:
     cash: float
     risk_target: float
 
+    @property
+    def n_assets(self) -> int:
+        return self.prices.shape[1]
+
 
 def run_backtest(
     strategy: Callable, risk_target: float, verbose: bool = False
@@ -108,7 +112,7 @@ def run_backtest(
         cash += execute_orders(latest_prices, trade_quantities, latest_spread)
 
         post_trade_cash.append(cash)
-        post_trade_quantities.append(quantities)
+        post_trade_quantities.append(quantities.copy())
 
     post_trade_cash = pd.Series(post_trade_cash, index=prices.index[lookback:-1])
     post_trade_quantities = pd.DataFrame(

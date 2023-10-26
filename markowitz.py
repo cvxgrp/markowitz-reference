@@ -115,11 +115,12 @@ def markowitz(data: Data, param: Parameters) -> tuple[np.ndarray, float]:
         param.z_lower <= z,
         z <= param.z_upper,
         L <= param.L_max,
+        T <= param.T_max,
     ]
 
     problem = cp.Problem(cp.Maximize(objective), constraints)
     problem.solve()
-
+    assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
     return w.value, c.value
 
 
