@@ -140,14 +140,22 @@ def main(from_checkpoint: bool = True):
             f"checkpoints/leverage_limit_{annualized_target}.pickle"
         )
 
-        # weight_limited_result = run_backtest(weight_limits_markowitz, sigma_target, verbose=True)
-        # weight_limited_result.save(f"checkpoints/weight_limited_{annualized_target}.pickle")
+        weight_limited_result = run_backtest(
+            weight_limits_markowitz, sigma_target, verbose=True
+        )
+        weight_limited_result.save(
+            f"checkpoints/weight_limited_{annualized_target}.pickle"
+        )
 
-        # unconstrained_result = run_backtest(unconstrained_markowitz, sigma_target, verbose=True)
-        # unconstrained_result.save(f"checkpoints/unconstrained_{annualized_target}.pickle")
+        unconstrained_result = run_backtest(
+            unconstrained_markowitz, sigma_target, verbose=True
+        )
+        unconstrained_result.save(
+            f"checkpoints/unconstrained_{annualized_target}.pickle"
+        )
 
-        # long_only_result = run_backtest(long_only_markowitz, sigma_target, verbose=True)
-        # long_only_result.save(f"checkpoints/long_only_{annualized_target}.pickle")
+        long_only_result = run_backtest(long_only_markowitz, sigma_target, verbose=True)
+        long_only_result.save(f"checkpoints/long_only_{annualized_target}.pickle")
 
     generate_table(
         equal_weights_results,
