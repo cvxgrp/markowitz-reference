@@ -67,7 +67,7 @@ def run_backtest(
 
     returns = prices.pct_change().dropna()
     means = (
-        synthetic_returns(prices).shift(-1).dropna()
+        synthetic_returns(prices, information_ratio=0.07).shift(-1).dropna()
     )  # At time t includes data up to t+1
     covariance_df = returns.ewm(halflife=125).cov()  # At time t includes data up to t
     days = returns.index
