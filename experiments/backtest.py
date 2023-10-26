@@ -40,6 +40,10 @@ class OptimizationInput:
     cash: float
     risk_target: float
 
+    @property
+    def n_assets(self) -> int:
+        return self.prices.shape[1]
+
 
 def run_backtest(
     strategy: Callable, risk_target: float, verbose: bool = False
