@@ -63,8 +63,6 @@ def leverage_limit_markowitz(inputs: OptimizationInput) -> np.ndarray:
     data, param = get_unconstrained_data_and_parameters(inputs)
 
     param.L_max = 1.5
-    param.c_lower = -0.05
-    param.c_upper = 1.0
     return markowitz(data, param)
 
 
