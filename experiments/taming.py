@@ -180,7 +180,7 @@ def main(from_checkpoint: bool = True):
         cost_aware_result,
     )
 
-    plot_timings(robust_result.timings)
+    # plot_timings(robust_result.timings)
     # plot_results(equal_weights_results, unconstrained_result, long_only_result)
 
 
@@ -191,20 +191,20 @@ def run_all_strategies(annualized_target: float) -> None:
     adjustment_factor = np.sqrt(equal_weights_results.periods_per_year)
     sigma_target = annualized_target / adjustment_factor
 
-    # unconstrained_result = run_backtest(
-    #     unconstrained_markowitz, sigma_target, verbose=True
-    # )
-    # unconstrained_result.save(f"checkpoints/unconstrained_{annualized_target}.pickle")
+    unconstrained_result = run_backtest(
+        unconstrained_markowitz, sigma_target, verbose=True
+    )
+    unconstrained_result.save(f"checkpoints/unconstrained_{annualized_target}.pickle")
 
-    # leverage_limit_result = run_backtest(
-    #     leverage_limit_markowitz, sigma_target, verbose=True
-    # )
-    # leverage_limit_result.save(f"checkpoints/leverage_limit_{annualized_target}.pickle")
+    leverage_limit_result = run_backtest(
+        leverage_limit_markowitz, sigma_target, verbose=True
+    )
+    leverage_limit_result.save(f"checkpoints/leverage_limit_{annualized_target}.pickle")
 
-    # turnover_limit_result = run_backtest(
-    #     turnover_limit_markowitz, sigma_target, verbose=True
-    # )
-    # turnover_limit_result.save(f"checkpoints/turnover_limit_{annualized_target}.pickle")
+    turnover_limit_result = run_backtest(
+        turnover_limit_markowitz, sigma_target, verbose=True
+    )
+    turnover_limit_result.save(f"checkpoints/turnover_limit_{annualized_target}.pickle")
 
     cost_aware_result = run_backtest(cost_aware_markowitz, sigma_target, verbose=True)
     cost_aware_result.save(f"checkpoints/cost_aware_{annualized_target}.pickle")
@@ -212,13 +212,13 @@ def run_all_strategies(annualized_target: float) -> None:
     robust_result = run_backtest(robust_markowitz, sigma_target, verbose=True)
     robust_result.save(f"checkpoints/robust_{annualized_target}.pickle")
 
-    # weight_limited_result = run_backtest(
-    #     weight_limits_markowitz, sigma_target, verbose=True
-    # )
-    # weight_limited_result.save(f"checkpoints/weight_limited_{annualized_target}.pickle")
+    weight_limited_result = run_backtest(
+        weight_limits_markowitz, sigma_target, verbose=True
+    )
+    weight_limited_result.save(f"checkpoints/weight_limited_{annualized_target}.pickle")
 
-    # long_only_result = run_backtest(long_only_markowitz, sigma_target, verbose=True)
-    # long_only_result.save(f"checkpoints/long_only_{annualized_target}.pickle")
+    long_only_result = run_backtest(long_only_markowitz, sigma_target, verbose=True)
+    long_only_result.save(f"checkpoints/long_only_{annualized_target}.pickle")
 
 
 def generate_table(
