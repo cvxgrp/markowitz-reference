@@ -1,10 +1,14 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 import pickle
 import sys
+import time
 from typing import Callable
 import numpy as np
+import cvxpy as cp
 import pandas as pd
 from utils import synthetic_returns
 
@@ -39,6 +43,7 @@ class OptimizationInput:
     quantities: np.ndarray
     cash: float
     risk_target: float
+    risk_free: float
 
     @property
     def n_assets(self) -> int:
@@ -64,6 +69,7 @@ def run_backtest(
 
     post_trade_cash = []
     post_trade_quantities = []
+    timings = []
 
     returns = prices.pct_change().dropna()
     means = (
@@ -76,6 +82,8 @@ def run_backtest(
         covariances[day] = covariance_df.loc[day]
 
     for t in range(lookback, len(prices) - 1):
+        start_time = time.perf_counter()
+
         day = prices.index[t]
 
         if verbose:
@@ -97,9 +105,10 @@ def run_backtest(
             quantities,
             cash,
             risk_target,
+            rf.iloc[t],
         )
 
-        w, _ = strategy(inputs_t)
+        w, _, problem = strategy(inputs_t)
 
         latest_prices = prices.iloc[t]  # At t
         latest_spread = spread.iloc[t]
@@ -114,11 +123,16 @@ def run_backtest(
         post_trade_cash.append(cash)
         post_trade_quantities.append(quantities.copy())
 
+        # Timings
+        end_time = time.perf_counter()
+        timings.append(Timing.get_timing(start_time, end_time, problem))
+
     post_trade_cash = pd.Series(post_trade_cash, index=prices.index[lookback:-1])
     post_trade_quantities = pd.DataFrame(
         post_trade_quantities, index=prices.index[lookback:-1], columns=prices.columns
     )
-    return BacktestResult(post_trade_cash, post_trade_quantities, risk_target)
+
+    return BacktestResult(post_trade_cash, post_trade_quantities, risk_target, timings)
 
 
 def create_orders(w, quantities, cash, latest_prices) -> np.array:
@@ -167,10 +181,34 @@ def interest_and_fees(
 
 
 @dataclass
+class Timing:
+    solver: float
+    cvxpy: float
+    other: float
+
+    @property
+    def total(self):
+        return self.solver + self.cvxpy + self.other
+
+    @classmethod
+    def get_timing(
+        cls, start_time: float, end_time: float, problem: cp.Problem | None
+    ) -> Timing:
+        if problem:
+            solver_time = problem.solver_stats.solve_time
+            cvxpy_time = problem.compilation_time
+            other_time = end_time - start_time - solver_time - cvxpy_time
+            return cls(solver_time, cvxpy_time, other_time)
+        else:
+            return cls(0, 0, 0)
+
+
+@dataclass
 class BacktestResult:
     cash: pd.Series
     quantities: pd.DataFrame
     risk_target: float
+    timings: list[Timing]
 
     @property
     def valuations(self) -> pd.DataFrame:
@@ -235,7 +273,7 @@ class BacktestResult:
             pickle.dump(self, f, pickle.HIGHEST_PROTOCOL)
 
     @staticmethod
-    def load(path: Path) -> "BacktestResult":
+    def load(path: Path) -> BacktestResult:
         with open(path, "rb") as f:
             return pickle.load(f)
 
