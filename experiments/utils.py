@@ -2,27 +2,21 @@ import numpy as np
 import pandas as pd
 
 
-def synthetic_returns(
-    prices: pd.DataFrame, var_r: float = 0.0005, var_eps: float = 0.02
-) -> pd.DataFrame:
+def synthetic_returns(prices: pd.DataFrame, information_ratio: float) -> pd.DataFrame:
     """
-    param prices: a DataFrame of prices
-    param var_r: the Gaussian variance of the returns
-    param var_eps: the Gaussian variance of the noise term
+    prices: a DataFrame of prices
+    information_ratio: the desired information ratio of the synthetic returns
 
     returns: a DataFrame of "synthetic return predictions" computed as
     alpha*(returns+noise), where alpha=var_r / (var_r + var_eps); this is the
     coefficient that minimize the variance of the prediction error under the
     above model.
-
-    var_r = 0.0005 and var_eps = 0.02 correspond to an information ratio
-    sqrt(alpha) of about 0.15.
     """
     returns = prices.pct_change()
+    var_r = returns.var()
 
-    alpha = var_r / (var_r + var_eps)
-    sigma_eps = np.sqrt(var_eps)
-    synthetic_returns = alpha * (
-        returns + np.random.normal(size=returns.shape) * sigma_eps
-    )
+    alpha = information_ratio**2
+    var_eps = var_r * (1 - alpha) / alpha
+    noise = np.random.normal(0, np.sqrt(var_eps), size=returns.shape)
+    synthetic_returns = alpha * (returns + noise)
     return synthetic_returns

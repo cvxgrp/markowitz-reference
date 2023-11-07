@@ -14,6 +14,7 @@
 from dataclasses import dataclass
 
 import numpy as np
+import cvxpy as cp
 
 
 @dataclass
@@ -55,13 +56,11 @@ class Parameters:
     risk_target: float  # risk target as volatility
 
 
-def markowitz(data: Data, param: Parameters) -> tuple[np.ndarray, float]:
+def markowitz(data: Data, param: Parameters) -> tuple[np.ndarray, float, cp.Problem]:
     """
     Markowitz portfolio optimization.
     This function contains the code listing for the accompanying paper.
     """
-
-    import cvxpy as cp
 
     w, c = cp.Variable(data.n_assets), cp.Variable()
 
@@ -121,7 +120,7 @@ def markowitz(data: Data, param: Parameters) -> tuple[np.ndarray, float]:
     problem = cp.Problem(cp.Maximize(objective), constraints)
     problem.solve()
     assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
-    return w.value, c.value
+    return w.value, c.value, problem
 
 
 if __name__ == "__main__":
