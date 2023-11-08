@@ -2,3 +2,5 @@ cvxpy
 numpy
 pandas
 matplotlib
+clarabel
+mosek

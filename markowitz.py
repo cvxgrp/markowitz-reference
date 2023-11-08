@@ -54,6 +54,13 @@ class Parameters:
     gamma_turn: float  # turnover cost
     gamma_risk: float  # risk cost
     risk_target: float  # risk target as volatility
+    gamma_c_lower: float  # lower bound on cash weight
+    gamma_c_upper: float  # upper bound on cash weight
+    gamma_w_lower: np.ndarray  # (n_assets,) array of lower bounds on asset weights
+    gamma_w_upper: np.ndarray  # (n_assets,) array of upper bounds on asset weights
+    gamma_z_lower: np.ndarray  # (n_assets,) array of lower bounds on trades
+    gamma_z_upper: np.ndarray  # (n_assets,) array of upper bounds on trades
+    gamma_L_max: float  # leverage gamma
 
 
 def markowitz(data: Data, param: Parameters) -> tuple[np.ndarray, float, cp.Problem]:
@@ -102,6 +109,91 @@ def markowitz(data: Data, param: Parameters) -> tuple[np.ndarray, float, cp.Prob
         - param.gamma_hold * holding_cost
         - param.gamma_trade * trading_cost
         - param.gamma_turn * cp.pos(T - param.T_max)
+        # - param.gamma_c_lower * cp.pos(param.c_lower - c)
+        # - param.gamma_c_upper * cp.pos(c - param.c_upper)
+        # - param.gamma_w_lower @ cp.pos(param.w_lower - w)
+        # - param.gamma_w_upper @ cp.pos(w - param.w_upper)
+        # - param.gamma_z_lower @ cp.pos(param.z_lower - z)
+        # - param.gamma_z_upper @ cp.pos(z - param.z_upper)
+        - param.gamma_L_max * cp.pos(L - param.L_max)
+    )
+
+    # print(param.T_max)
+    # print(param.L_max)
+    # print(param.risk_target)
+
+    # print(1, param.gamma_turn)
+    # print(4, param.gamma_risk)
+    # print(5, param.gamma_L_max)
+
+    constraints = [
+        cp.sum(w) + c == 1,
+        c == data.c_prev - cp.sum(z),
+        param.c_lower <= c,
+        c <= param.c_upper,
+        param.w_lower <= w,
+        w <= param.w_upper,
+        param.z_lower <= z,
+        z <= param.z_upper,
+        # L <= param.L_max,
+        # T <= param.T_max, # We have this as a soft constraint
+    ]
+
+    problem = cp.Problem(cp.Maximize(objective), constraints)
+    problem.solve(solver="MOSEK")
+
+    assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
+    return w.value, c.value, problem
+
+
+def markowitz_hard(
+    data: Data, param: Parameters
+) -> tuple[np.ndarray, float, cp.Problem]:
+    """
+    Markowitz portfolio optimization with hard constraints.
+    This function contains the code listing for the accompanying paper.
+    """
+
+    w, c = cp.Variable(data.n_assets), cp.Variable()
+
+    z = w - data.w_prev
+    T = cp.norm1(z)
+    L = cp.norm1(w)
+
+    # worst-case (robust) return
+    factor_return = (data.F @ data.factor_mean).T @ w
+    idio_return = data.idio_mean @ w
+    mean_return = factor_return + idio_return + data.risk_free * c
+    return_uncertainty = param.rho_mean @ cp.abs(w)
+    return_wc = mean_return - return_uncertainty
+
+    # asset volatilities
+    factor_volas = cp.norm2(data.F @ data.factor_covariance_chol, axis=1)
+    volas = factor_volas + data.idio_volas
+
+    # portfolio risk
+    factor_risk = cp.norm2((data.F @ data.factor_covariance_chol).T @ w)
+    idio_risk = cp.norm2(cp.multiply(data.idio_volas, w))
+    risk = cp.norm2(cp.hstack([factor_risk, idio_risk]))
+
+    # worst-case (robust) risk
+    risk_uncertainty = param.rho_covariance**0.5 * volas @ cp.abs(w)
+    risk_wc = cp.norm2(cp.hstack([risk, risk_uncertainty]))
+
+    asset_holding_cost = data.kappa_short @ cp.pos(-w)
+    cash_holding_cost = data.kappa_borrow * cp.pos(-c)
+    holding_cost = asset_holding_cost + cash_holding_cost
+
+    spread_cost = data.kappa_spread @ cp.abs(z)
+    impact_cost = data.kappa_impact @ cp.power(cp.abs(z), 3 / 2)
+    trading_cost = spread_cost + impact_cost
+
+    objective = (
+        return_wc
+        # - param.gamma_risk * cp.pos(risk_wc - param.risk_target)
+        - param.gamma_hold * holding_cost
+        - param.gamma_trade * trading_cost
+        # - param.gamma_turn * cp.pos(T - param.T_max)
     )
 
     constraints = [
@@ -115,10 +207,11 @@ def markowitz(data: Data, param: Parameters) -> tuple[np.ndarray, float, cp.Prob
         z <= param.z_upper,
         L <= param.L_max,
         T <= param.T_max,
+        risk_wc <= param.risk_target,
     ]
 
     problem = cp.Problem(cp.Maximize(objective), constraints)
-    problem.solve()
+    problem.solve(solver="MOSEK")
     assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
     return w.value, c.value, problem
 
