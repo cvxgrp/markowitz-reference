@@ -135,6 +135,158 @@ def run_backtest(
     return BacktestResult(post_trade_cash, post_trade_quantities, risk_target, timings)
 
 
+def run_markowitz(
+    strategy: callable,
+    prices,
+    spread,
+    volume,
+    rf,
+    risk_target,
+    hyperparameters,
+    verbose: bool = False,
+) -> tuple[pd.Series, pd.DataFrame]:
+    """
+    Run a simplified backtest for a given strategy.
+    At time t we use data from t-lookback to t to compute the optimal portfolio
+    weights and then execute the trades at time t.
+    """
+
+    # prices, spread, volume, rf = load_data()
+    n_assets = prices.shape[1]
+    lookback = 500
+
+    post_trade_cash = []
+    post_trade_quantities = []
+
+    constraint_names = [
+        "FullInvestment",
+        "Cash",
+        "CLower",
+        "CUpper",
+        "WLower",
+        "WUpper",
+        "ZLower",
+        "ZUpper",
+        "Leverage",
+        "Turnover",
+        "Risk",
+    ]
+
+    dual_optimals = (
+        pd.DataFrame(
+            columns=constraint_names,
+            index=prices.index[lookback:-1],
+        )
+        * np.nan
+    )
+
+    timings = []
+
+    returns = prices.pct_change().dropna()
+    means = (
+        synthetic_returns(prices, information_ratio=0.07).shift(-1).dropna()
+    )  # At time t includes data up to t+1
+    covariance_df = returns.ewm(halflife=125).cov()  # At time t includes data up to t
+    days = returns.index
+    covariances = {}
+    for day in days:
+        covariances[day] = covariance_df.loc[day]
+
+    # Initialize portfolio
+    prices_0 = prices.iloc[lookback - 1]
+    quantities = np.ones(n_assets) * (1 / prices_0) / np.sum(1 / prices_0) * 1e6
+    cash = 0
+
+    prices_0 = prices.iloc[:lookback]
+    spread_0 = spread.iloc[:lookback]
+    volume_0 = volume.iloc[:lookback]
+
+    day0 = prices.index[lookback - 1]
+    mean_0 = means.loc[day0]  # Forecast for return t to t+1
+    covariance_0 = covariances[day0]  # Forecast for covariance t to t+1
+
+    inputs_0 = OptimizationInput(
+        prices_0,
+        mean_0,
+        covariance_0,
+        spread_0,
+        volume_0,
+        quantities,
+        cash,
+        risk_target,
+        rf.iloc[lookback - 1],
+    )
+    w, c, problem, problem_solved = strategy(inputs_0, hyperparameters, initialize=True)
+
+    dollar_investment = w * 1e6
+    quantities = dollar_investment / prices_0.iloc[-1]
+    cash = 1e6 * c
+
+    for t in range(lookback, len(prices) - 1):
+        start_time = time.perf_counter()
+        day = prices.index[t]
+
+        if verbose and t % 100 == 0:
+            print(f"Day {t} of {len(prices)-1}, {day}")
+
+        prices_t = prices.iloc[t - lookback : t + 1]  # Up to t
+        spread_t = spread.iloc[t - lookback : t + 1]
+        volume_t = volume.iloc[t - lookback : t + 1]
+
+        mean_t = means.loc[day]  # Forecast for return t to t+1
+        covariance_t = covariances[day]  # Forecast for covariance t to t+1
+
+        inputs_t = OptimizationInput(
+            prices_t,
+            mean_t,
+            covariance_t,
+            spread_t,
+            volume_t,
+            quantities,
+            cash,
+            risk_target,
+            rf.iloc[t],
+        )
+
+        w, _, problem, problem_solved = strategy(inputs_t, hyperparameters)
+
+        latest_prices = prices.iloc[t]  # At t
+        latest_spread = spread.iloc[t]
+
+        cash += interest_and_fees(
+            cash, rf.iloc[t - 1], quantities, prices.iloc[t - 1], day
+        )
+        trade_quantities = create_orders(w, quantities, cash, latest_prices)
+        quantities += trade_quantities
+        cash += execute_orders(latest_prices, trade_quantities, latest_spread)
+
+        post_trade_cash.append(cash)
+        post_trade_quantities.append(quantities.copy())
+
+        if problem_solved:
+            for name in constraint_names:
+                dual_optimals.loc[day, name] = problem.constraints[
+                    constraint_names.index(name)
+                ].dual_value
+
+        # Timings
+        end_time = time.perf_counter()
+        if problem_solved:
+            timings.append(Timing.get_timing(start_time, end_time, problem))
+        else:
+            timings.append(None)
+
+    post_trade_cash = pd.Series(post_trade_cash, index=prices.index[lookback:-1])
+    post_trade_quantities = pd.DataFrame(
+        post_trade_quantities, index=prices.index[lookback:-1], columns=prices.columns
+    )
+
+    return (
+        BacktestResult(post_trade_cash, post_trade_quantities, risk_target, timings),
+        dual_optimals,
+    )
+
+
 def create_orders(w, quantities, cash, latest_prices) -> np.array:
     portfolio_value = cash + quantities @ latest_prices
     w_prev = (quantities * latest_prices) / portfolio_value
