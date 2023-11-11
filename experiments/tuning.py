@@ -13,22 +13,17 @@ class HyperParameters:
     gamma_risk: float
 
 
-def get_data_and_parameters(
-    inputs: callable, hyperparameters: callable, hard: bool = True
-):
-    if hard:
-        L_max = 1.6
-        T_max = 10 / 252
-    else:
-        L_max = 1e3
-        T_max = 1e3
+def get_data_and_parameters(inputs: callable, hyperparameters: callable):
+    L_max = 1.6
+    T_max = 10 / 252
+    risk_target = inputs.risk_target
 
     w_lower = -0.1
     w_upper = 0.15
     c_lower = -0.3
     c_upper = 1
-    z_lower = -0.05
-    z_upper = 0.05
+    z_lower = -0.1
+    z_upper = 0.1
 
     rho_covariance = 0.02
     rho_mean = 0.0
@@ -67,7 +62,7 @@ def get_data_and_parameters(
         gamma_trade=hyperparameters.gamma_trade,
         gamma_turn=hyperparameters.gamma_turn,
         gamma_risk=hyperparameters.gamma_risk,
-        risk_target=inputs.risk_target,
+        risk_target=risk_target,
         gamma_leverage=hyperparameters.gamma_leverage,
     )
 
@@ -81,8 +76,8 @@ def initialize_markowitz(inputs, hyperparameters):
 
     w_lower = -0.1
     w_upper = 0.15
-    c_lower = -0.3
-    c_upper = 1
+    c_lower = 0
+    c_upper = 0
     z_lower = -1e3
     z_upper = 1e3
 
@@ -127,14 +122,14 @@ def initialize_markowitz(inputs, hyperparameters):
     return w, c, problem, problem_solved
 
 
-def full_markowitz(inputs, hyperparamters, initialize=False):
+def full_markowitz(inputs, hyperparamters, initialize=False, hard=True):
     if not initialize:
         data, param = get_data_and_parameters(inputs, hyperparamters)
     else:
         return initialize_markowitz(inputs, hyperparamters)
 
     try:
-        w, c, problem, problem_solved = markowitz(data, param)
+        w, c, problem, problem_solved = markowitz(data, param, hard=hard)
         return w, c, problem, problem_solved
     except cp.SolverError:
         # print("Failed to solve markowitz")

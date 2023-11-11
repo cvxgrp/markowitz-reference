@@ -57,7 +57,9 @@ class Parameters:
     gamma_leverage: float  # leverage gamma
 
 
-def markowitz(data: Data, param: Parameters) -> tuple[np.ndarray, float, cp.Problem]:
+def markowitz(
+    data: Data, param: Parameters, hard: bool
+) -> tuple[np.ndarray, float, cp.Problem]:
     """
     Markowitz portfolio optimization.
     This function contains the code listing for the accompanying paper.
@@ -106,10 +108,14 @@ def markowitz(data: Data, param: Parameters) -> tuple[np.ndarray, float, cp.Prob
         w <= param.w_upper,
         param.z_lower <= z,
         z <= param.z_upper,
-        L <= param.L_max,
-        T <= param.T_max,
-        risk_wc <= param.risk_target,
     ]
+
+    if hard:
+        constraints += [
+            L <= param.L_max,
+            T <= param.T_max,
+            risk_wc <= param.risk_target,
+        ]
 
     # Naming the constraints
     constraints[0].name = "FullInvestment"
@@ -120,9 +126,10 @@ def markowitz(data: Data, param: Parameters) -> tuple[np.ndarray, float, cp.Prob
     constraints[5].name = "WUpper"
     constraints[6].name = "ZLower"
     constraints[7].name = "ZUpper"
-    constraints[8].name = "Leverage"
-    constraints[9].name = "Turnover"
-    constraints[10].name = "Risk"
+    if hard:
+        constraints[8].name = "Leverage"
+        constraints[9].name = "Turnover"
+        constraints[10].name = "Risk"
 
     objective = return_wc * 100
 

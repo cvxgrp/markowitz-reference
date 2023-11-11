@@ -143,6 +143,7 @@ def run_markowitz(
     rf,
     risk_target,
     hyperparameters,
+    hard=True,
     verbose: bool = False,
 ) -> tuple[pd.Series, pd.DataFrame]:
     """
@@ -167,10 +168,14 @@ def run_markowitz(
         "WUpper",
         "ZLower",
         "ZUpper",
-        "Leverage",
-        "Turnover",
-        "Risk",
     ]
+
+    if hard:
+        constraint_names += [
+            "Leverage",
+            "Turnover",
+            "Risk",
+        ]
 
     dual_optimals = (
         pd.DataFrame(
@@ -194,33 +199,36 @@ def run_markowitz(
 
     # Initialize portfolio
     prices_0 = prices.iloc[lookback - 1]
-    quantities = np.ones(n_assets) * (1 / prices_0) / np.sum(1 / prices_0) * 1e6
-    cash = 0
+    quantities = np.zeros(n_assets) * (1 / prices_0) / np.sum(1 / prices_0) * 1e6
+    cash = 1e6
 
-    prices_0 = prices.iloc[:lookback]
-    spread_0 = spread.iloc[:lookback]
-    volume_0 = volume.iloc[:lookback]
+    # prices_0 = prices.iloc[:lookback]
+    # spread_0 = spread.iloc[:lookback]
+    # volume_0 = volume.iloc[:lookback]
 
-    day0 = prices.index[lookback - 1]
-    mean_0 = means.loc[day0]  # Forecast for return t to t+1
-    covariance_0 = covariances[day0]  # Forecast for covariance t to t+1
+    # day0 = prices.index[lookback - 1]
+    # mean_0 = 0 * means.loc[day0]  # Forecast for return t to t+1
+    # covariance_0 = covariances[day0]  # Forecast for covariance t to t+1
 
-    inputs_0 = OptimizationInput(
-        prices_0,
-        mean_0,
-        covariance_0,
-        spread_0,
-        volume_0,
-        quantities,
-        cash,
-        risk_target,
-        rf.iloc[lookback - 1],
-    )
-    w, c, problem, problem_solved = strategy(inputs_0, hyperparameters, initialize=True)
+    # inputs_0 = OptimizationInput(
+    #     prices_0,
+    #     mean_0,
+    #     covariance_0,
+    #     spread_0,
+    #     volume_0,
+    #     quantities,
+    #     cash,
+    #     risk_target,
+    #     rf.iloc[lookback - 1],
+    # )
+    # print(1)
+    # w, c, problem, problem_solved =
+    #  strategy(inputs_0, hyperparameters, initialize=True, hard=False)
+    # print(2)
 
-    dollar_investment = w * 1e6
-    quantities = dollar_investment / prices_0.iloc[-1]
-    cash = 1e6 * c
+    # dollar_investment = w * 1e6
+    # quantities = dollar_investment / prices_0.iloc[-1]
+    # cash = 1e6 * c
 
     for t in range(lookback, len(prices) - 1):
         start_time = time.perf_counter()
@@ -248,7 +256,7 @@ def run_markowitz(
             rf.iloc[t],
         )
 
-        w, _, problem, problem_solved = strategy(inputs_t, hyperparameters)
+        w, _, problem, problem_solved = strategy(inputs_t, hyperparameters, hard=hard)
 
         latest_prices = prices.iloc[t]  # At t
         latest_spread = spread.iloc[t]
