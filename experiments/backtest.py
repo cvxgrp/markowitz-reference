@@ -258,8 +258,6 @@ def run_markowitz(
 
         w, _, problem, problem_solved = strategy(inputs_t, hyperparameters, hard=hard)
 
-        print(w)
-
         latest_prices = prices.iloc[t]  # At t
         latest_spread = spread.iloc[t]
 
