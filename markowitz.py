@@ -45,11 +45,14 @@ class Parameters:
     c_upper: float  # upper bound on cash weight
     z_lower: np.ndarray  # (n_assets,) array of lower bounds on trades
     z_upper: np.ndarray  # (n_assets,) array of upper bounds on trades
-    T_max: float  # turnover target
+    T_target: float  # turnover target
+    T_max: float  # turnover limit
+    L_target: float  # leverage target
     L_max: float  # leverage limit
+    risk_target: float  # risk target as volatility
+    risk_max: float  # risk limit as volatility
     rho_mean: np.ndarray  # (n_assets,) array of mean returns for rho
     rho_covariance: float  # uncertainty in covariance matrix
-    risk_target: float  # risk target as volatility
     gamma_hold: float  # holding cost
     gamma_trade: float  # trading cost
     gamma_turn: float  # turnover cost
@@ -58,7 +61,9 @@ class Parameters:
 
 
 def markowitz(
-    data: Data, param: Parameters, hard: bool
+    data: Data,
+    param: Parameters,
+    # hard: bool
 ) -> tuple[np.ndarray, float, cp.Problem]:
     """
     Markowitz portfolio optimization.
@@ -110,12 +115,13 @@ def markowitz(
         z <= param.z_upper,
     ]
 
-    if hard:
-        constraints += [
-            L <= param.L_max,
-            T <= param.T_max,
-            risk_wc <= param.risk_target,
-        ]
+    # if hard:
+    if param.L_max:
+        constraints += [L <= param.L_max]
+    if param.T_max:
+        constraints += [T <= param.T_max]
+    if param.risk_max:
+        constraints += [risk_wc <= param.risk_max]
 
     # Naming the constraints
     constraints[0].name = "FullInvestment"
@@ -126,21 +132,48 @@ def markowitz(
     constraints[5].name = "WUpper"
     constraints[6].name = "ZLower"
     constraints[7].name = "ZUpper"
-    if hard:
-        constraints[8].name = "Leverage"
-        constraints[9].name = "Turnover"
-        constraints[10].name = "Risk"
+    constraints[8].name = "Leverage"
+    constraints[9].name = "Turnover"
+    constraints[10].name = "Risk"
+    # name the remaining constraints Leverage, Turnover, Risk if they exist
 
-    objective = return_wc * 100
+    # if param.L_max:
+    #     constraints[8].name = "Leverage"
+    #     if param.T_max:
+    #         constraints[9].name = "Turnover"
+    #         if param.risk_max:
+    #             constraints[10].name = "Risk"
+    #     elif param.risk_max:
+    #         constraints[9].name = "Risk"
+    # elif param.T_max:
+    #     constraints[8].name = "Turnover"
+    #     if param.risk_max:
+    #         constraints[9].name = "Risk"
+    # elif param.risk_max:
+    #     constraints[8].name = "Risk"
 
-    if param.gamma_hold != 0:
-        objective -= param.gamma_hold * holding_cost * 100
-    if param.gamma_trade != 0:
-        objective -= param.gamma_trade * trading_cost * 100
-    if param.gamma_turn != 0:
-        objective -= param.gamma_turn * cp.pos(T - param.T_max) * 100
-    if param.gamma_leverage != 0:
-        objective -= param.gamma_leverage * cp.pos(L - param.L_max) * 100
+    # if hard:
+    # constraints[8].name = "Leverage"
+    # constraints[9].name = "Turnover"
+    # constraints[10].name = "Risk"
+
+    objective = (
+        return_wc
+        - param.gamma_risk * cp.pos(risk_wc - param.risk_target)
+        - param.gamma_hold * holding_cost
+        - param.gamma_trade * trading_cost
+        - param.gamma_turn * cp.pos(T - param.T_target)
+        - param.gamma_leverage * cp.pos(L - param.L_target)
+    )
+
+    # if param.gamma_hold != 0:
+    #     objective -= param.gamma_hold * holding_cost * 100
+    # if param.gamma_trade != 0:
+    #     objective -= param.gamma_trade * trading_cost * 100
+    # if param.gamma_turn != 0:
+    #     objective -= param.gamma_turn * cp.pos(T - param.T_max) * 100
+    # if param.gamma_leverage != 0:
+    #     objective -= param.gamma_leverage * cp.pos(L - param.L_max) * 100
 
     problem = cp.Problem(cp.Maximize(objective), constraints)
     try:

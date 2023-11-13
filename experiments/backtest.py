@@ -141,7 +141,9 @@ def run_markowitz(
     spread,
     volume,
     rf,
-    risk_target,
+    # risk_target,
+    targets,
+    limits,
     hyperparameters,
     hard=True,
     verbose: bool = False,
@@ -168,14 +170,17 @@ def run_markowitz(
         "WUpper",
         "ZLower",
         "ZUpper",
+        "Leverage",
+        "Turnover",
+        "Risk",
     ]
 
-    if hard:
-        constraint_names += [
-            "Leverage",
-            "Turnover",
-            "Risk",
-        ]
+    # if hard:
+    #     constraint_names += [
+    #         "Leverage",
+    #         "Turnover",
+    #         "Risk",
+    #     ]
 
     dual_optimals = (
         pd.DataFrame(
@@ -198,17 +203,48 @@ def run_markowitz(
         covariances[day] = covariance_df.loc[day]
 
     # Initialize portfolio
+    # quantities = initial_quantities
+    # cash = initial_cash
+
     prices_0 = prices.iloc[lookback - 1]
-    quantities = np.zeros(n_assets) * (1 / prices_0) / np.sum(1 / prices_0) * 1e6
-    cash = 1e6
+    w = np.ones(n_assets) / (n_assets)
+    c = 0
+
+    inputs_0 = OptimizationInput(
+        prices.iloc[: lookback - 1],
+        None,
+        returns.iloc[: lookback - 1].cov(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+
+    w, c, problem, problem_solved = strategy(
+        inputs_0, hyperparameters, targets=targets, limits=limits, initialize=True
+    )
+    # get quantitites from w
+    quantities = w * 1e6 / prices_0.iloc[-1]
+    cash = 1e6 * c
+
+    # quantities = w * 1e6 / prices_0
+    # cash = 1e6 * c
+
+    # quantities = np.ones(n_assets) * (1 / prices_0)
+    # / np.sum(1 / prices_0) * 1e6 * (n_assets / (n_assets + 1))
+    # cash = 0
 
     # prices_0 = prices.iloc[:lookback]
     # spread_0 = spread.iloc[:lookback]
     # volume_0 = volume.iloc[:lookback]
 
     # day0 = prices.index[lookback - 1]
-    # mean_0 = 0 * means.loc[day0]  # Forecast for return t to t+1
-    # covariance_0 = covariances[day0]  # Forecast for covariance t to t+1
+    # mean_0 = 0 * means.loc[day0]
+    # # Forecast for return t to t+1
+    # covariance_0 = covariances[day0]
+    # # Forecast for covariance t to t+1
 
     # inputs_0 = OptimizationInput(
     #     prices_0,
@@ -221,10 +257,9 @@ def run_markowitz(
     #     risk_target,
     #     rf.iloc[lookback - 1],
     # )
-    # print(1)
     # w, c, problem, problem_solved =
-    #  strategy(inputs_0, hyperparameters, initialize=True, hard=False)
-    # print(2)
+    # strategy(inputs_0, hyperparameters,
+    #  initialize=True, hard=False)
 
     # dollar_investment = w * 1e6
     # quantities = dollar_investment / prices_0.iloc[-1]
@@ -252,11 +287,19 @@ def run_markowitz(
             volume_t,
             quantities,
             cash,
-            risk_target,
+            limits.risk_max,
             rf.iloc[t],
         )
 
-        w, _, problem, problem_solved = strategy(inputs_t, hyperparameters, hard=hard)
+        # risk = np.sqrt(
+        #     cp.quad_form(w, covariance_t).value
+        # ) * np.sqrt(252)
+        # print(risk)
+        # assert False
+
+        w, _, problem, problem_solved = strategy(
+            inputs_t, hyperparameters, targets=targets, limits=limits
+        )
 
         latest_prices = prices.iloc[t]  # At t
         latest_spread = spread.iloc[t]
@@ -290,7 +333,9 @@ def run_markowitz(
     )
 
     return (
-        BacktestResult(post_trade_cash, post_trade_quantities, risk_target, timings),
+        BacktestResult(
+            post_trade_cash, post_trade_quantities, limits.risk_max, timings
+        ),
         dual_optimals,
     )
 
