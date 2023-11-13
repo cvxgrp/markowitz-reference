@@ -145,7 +145,7 @@ def run_markowitz(
     targets,
     limits,
     hyperparameters,
-    hard=True,
+    # hard=True,
     verbose: bool = False,
 ) -> tuple[pd.Series, pd.DataFrame]:
     """
@@ -206,28 +206,31 @@ def run_markowitz(
     # quantities = initial_quantities
     # cash = initial_cash
 
-    prices_0 = prices.iloc[lookback - 1]
-    w = np.ones(n_assets) / (n_assets)
-    c = 0
+    # prices_0 = prices.iloc[lookback - 1]
+    # w = np.ones(n_assets) / (n_assets)
+    # c = 0
 
-    inputs_0 = OptimizationInput(
-        prices.iloc[: lookback - 1],
-        None,
-        returns.iloc[: lookback - 1].cov(),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
+    # inputs_0 = OptimizationInput(
+    #     prices.iloc[: lookback - 1],
+    #     None,
+    #     returns.iloc[: lookback - 1].cov(),
+    #     None,
+    #     None,
+    #     None,
+    #     None,
+    #     None,
+    #     None,
+    # )
 
-    w, c, problem, problem_solved = strategy(
-        inputs_0, hyperparameters, targets=targets, limits=limits, initialize=True
-    )
-    # get quantitites from w
-    quantities = w * 1e6 / prices_0.iloc[-1]
-    cash = 1e6 * c
+    # w, c, problem, problem_solved = strategy(
+    #     inputs_0, hyperparameters, targets=targets, limits=limits, initialize=True
+    # )
+    # # get quantitites from w
+    # quantities = w * 1e6 / prices_0.iloc[-1]
+    # cash = 1e6 * c
+
+    quantities = np.zeros(n_assets)
+    cash = 1e6
 
     # quantities = w * 1e6 / prices_0
     # cash = 1e6 * c

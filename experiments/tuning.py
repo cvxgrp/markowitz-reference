@@ -39,7 +39,7 @@ def get_data_and_parameters(
     w_lower = -0.1
     w_upper = 0.15
     c_lower = -0.3
-    c_upper = 0.4
+    c_upper = 1
     z_lower = -0.1
     z_upper = 0.1
 
