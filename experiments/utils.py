@@ -3,10 +3,7 @@ import pandas as pd
 
 
 def synthetic_returns(
-    prices: pd.DataFrame,
-    information_ratio: float,
-    smoothing_len: int = 5,
-    seed: int = 0,
+    prices: pd.DataFrame, information_ratio: float, forward_smoothing: int
 ) -> pd.DataFrame:
     """
     prices: a DataFrame of prices
@@ -19,17 +16,10 @@ def synthetic_returns(
     coefficient that minimize the variance of the prediction error under the
     above model.
     """
-    np.random.seed(seed)
+    np.random.default_rng(1)
 
     returns = prices.pct_change()
-
-    returns = returns.shift(-smoothing_len + 1)
-    returns = pd.concat([returns.iloc[: smoothing_len - 1], returns])
-    index_new = returns.index.tolist()
-    index_new[: smoothing_len - 1] = [i for i in range(smoothing_len - 1)]
-    returns.index = index_new
-    returns = returns.rolling(smoothing_len).mean()
-
+    returns = returns.rolling(forward_smoothing).mean().shift(-(forward_smoothing - 1))
     var_r = returns.var()
 
     alpha = information_ratio**2
@@ -37,8 +27,20 @@ def synthetic_returns(
     noise = np.random.normal(0, np.sqrt(var_eps), size=returns.shape)
     synthetic_returns = alpha * (returns + noise)
 
-    return synthetic_returns.ffill().dropna()
+    return synthetic_returns
 
 
-def initialize_markowitz():
-    pass
+if __name__ == "__main__":
+    prices = pd.read_csv("data/prices.csv", index_col=0, parse_dates=True)
+    synthetic_returns = synthetic_returns(
+        prices, information_ratio=0.15, forward_smoothing=5
+    )
+    returns = prices.pct_change()
+    print(
+        (
+            np.sign(synthetic_returns - returns.mean())
+            == np.sign(returns - returns.mean())
+        )
+        .mean(axis=0)
+        .describe()
+    )

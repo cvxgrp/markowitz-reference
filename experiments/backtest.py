@@ -63,6 +63,7 @@ def run_backtest(
     n_assets = prices.shape[1]
 
     lookback = 500
+    forward_smoothing = 5
 
     quantities = np.zeros(n_assets)
     cash = 1e6
@@ -73,7 +74,11 @@ def run_backtest(
 
     returns = prices.pct_change().dropna()
     means = (
-        synthetic_returns(prices, information_ratio=0.07).shift(-1).dropna()
+        synthetic_returns(
+            prices, information_ratio=0.15, forward_smoothing=forward_smoothing
+        )
+        .shift(-1)
+        .dropna()
     )  # At time t includes data up to t+1
     covariance_df = returns.ewm(halflife=125).cov()  # At time t includes data up to t
     days = returns.index
@@ -81,13 +86,13 @@ def run_backtest(
     for day in days:
         covariances[day] = covariance_df.loc[day]
 
-    for t in range(lookback, len(prices) - 1):
+    for t in range(lookback, len(prices) - forward_smoothing):
         start_time = time.perf_counter()
 
         day = prices.index[t]
 
         if verbose:
-            print(f"Day {t} of {len(prices)-1}, {day}")
+            print(f"Day {t} of {len(prices)-forward_smoothing}, {day}")
 
         prices_t = prices.iloc[t - lookback : t + 1]  # Up to t
         spread_t = spread.iloc[t - lookback : t + 1]
@@ -127,9 +132,13 @@ def run_backtest(
         end_time = time.perf_counter()
         timings.append(Timing.get_timing(start_time, end_time, problem))
 
-    post_trade_cash = pd.Series(post_trade_cash, index=prices.index[lookback:-1])
+    post_trade_cash = pd.Series(
+        post_trade_cash, index=prices.index[lookback:-forward_smoothing]
+    )
     post_trade_quantities = pd.DataFrame(
-        post_trade_quantities, index=prices.index[lookback:-1], columns=prices.columns
+        post_trade_quantities,
+        index=prices.index[lookback:-forward_smoothing],
+        columns=prices.columns,
     )
 
     return BacktestResult(post_trade_cash, post_trade_quantities, risk_target, timings)
@@ -449,12 +458,11 @@ class BacktestResult:
 
     @property
     def turnover(self) -> float:
-        """
-        Note that turnover here includes weight changes due to price changes.
-        """
-        return (
-            self.asset_weights.diff().abs().sum(axis=1).mean() * self.periods_per_year
-        )
+        trades = self.quantities.diff()
+        prices = load_data()[0].loc[self.history]
+        valuation_trades = trades * prices
+        relative_trades = valuation_trades.div(self.portfolio_value, axis=0)
+        return relative_trades.abs().sum(axis=1).mean() * self.periods_per_year
 
     @property
     def mean_return(self) -> float:
@@ -474,7 +482,22 @@ class BacktestResult:
 
     @property
     def sharpe(self) -> float:
-        return self.mean_return / self.volatility  # TODO: risk free rate
+        risk_free = load_data()[3].loc[self.history]
+        excess_return = self.portfolio_returns - risk_free
+        return (
+            excess_return.mean() / excess_return.std() * np.sqrt(self.periods_per_year)
+        )
+
+    def active_return(self, benchmark: BacktestResult) -> float:
+        return self.mean_return - benchmark.mean_return
+
+    def active_risk(self, benchmark: BacktestResult) -> float:
+        return self.portfolio_returns.sub(benchmark.portfolio_returns).std() * np.sqrt(
+            self.periods_per_year
+        )
+
+    def information_ratio(self, benchmark: BacktestResult) -> float:
+        return self.active_return(benchmark) / self.active_risk(benchmark)
 
     def save(self, path: Path):
         with open(path, "wb") as f:
@@ -492,7 +515,7 @@ if __name__ == "__main__":
     w_targets = np.ones(n_assets) / (n_assets + 1)
     c_target = 1 / (n_assets + 1)
     result = run_backtest(
-        lambda _inputs: (w_targets, c_target), risk_target=0.0, verbose=True
+        lambda _inputs: (w_targets, c_target, None), risk_target=0.0, verbose=True
     )
     print(
         f"Mean return: {result.mean_return:.2%},\n"

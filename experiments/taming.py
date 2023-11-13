@@ -64,7 +64,7 @@ def weight_limits_markowitz(inputs: OptimizationInput) -> np.ndarray:
 def leverage_limit_markowitz(inputs: OptimizationInput) -> np.ndarray:
     data, param = get_unconstrained_data_and_parameters(inputs)
 
-    param.L_max = 1.5
+    param.L_max = 1.6
     return markowitz(data, param)
 
 
@@ -77,8 +77,9 @@ def turnover_limit_markowitz(inputs: OptimizationInput) -> np.ndarray:
 
 def robust_markowitz(inputs: OptimizationInput) -> np.ndarray:
     data, param = get_unconstrained_data_and_parameters(inputs)
-
-    param.rho_mean = np.abs(0.1 * inputs.mean.values)
+    param.rho_mean = np.percentile(np.abs(inputs.mean.values), 20, axis=0) * np.ones(
+        inputs.n_assets
+    )
     param.rho_covariance = 0.04
     return markowitz(data, param)
 
@@ -105,7 +106,7 @@ def get_unconstrained_data_and_parameters(
     gamma_risk = 5.0
 
     data = Data(
-        w_prev=(inputs.quantities * latest_prices / portfolio_value),
+        w_prev=(inputs.quantities * latest_prices / portfolio_value).values,
         c_prev=(inputs.cash / portfolio_value),
         idio_mean=np.zeros(n_assets),
         factor_mean=inputs.mean.values,
@@ -138,8 +139,8 @@ def get_unconstrained_data_and_parameters(
     return data, param
 
 
-def main(from_checkpoint: bool = True):
-    annualized_target = 0.13
+def main(from_checkpoint: bool = False):
+    annualized_target = 0.10
 
     if not from_checkpoint:
         run_all_strategies(annualized_target)
@@ -148,9 +149,6 @@ def main(from_checkpoint: bool = True):
 
     unconstrained_result = BacktestResult.load(
         f"checkpoints/unconstrained_{annualized_target}.pickle"
-    )
-    long_only_result = BacktestResult.load(
-        f"checkpoints/long_only_{annualized_target}.pickle"
     )
     weight_limited_result = BacktestResult.load(
         f"checkpoints/weight_limited_{annualized_target}.pickle"
@@ -172,7 +170,6 @@ def main(from_checkpoint: bool = True):
     generate_table(
         equal_weights_results,
         unconstrained_result,
-        long_only_result,
         weight_limited_result,
         leverage_limit_result,
         turnover_limit_result,
@@ -191,40 +188,42 @@ def run_all_strategies(annualized_target: float) -> None:
     adjustment_factor = np.sqrt(equal_weights_results.periods_per_year)
     sigma_target = annualized_target / adjustment_factor
 
+    print("Running unconstrained Markowitz")
     unconstrained_result = run_backtest(
         unconstrained_markowitz, sigma_target, verbose=True
     )
     unconstrained_result.save(f"checkpoints/unconstrained_{annualized_target}.pickle")
 
+    print("Running leverage limit Markowitz")
     leverage_limit_result = run_backtest(
         leverage_limit_markowitz, sigma_target, verbose=True
     )
     leverage_limit_result.save(f"checkpoints/leverage_limit_{annualized_target}.pickle")
 
+    print("Running turnover limit Markowitz")
     turnover_limit_result = run_backtest(
         turnover_limit_markowitz, sigma_target, verbose=True
     )
     turnover_limit_result.save(f"checkpoints/turnover_limit_{annualized_target}.pickle")
 
+    print("Running cost-aware Markowitz")
     cost_aware_result = run_backtest(cost_aware_markowitz, sigma_target, verbose=True)
     cost_aware_result.save(f"checkpoints/cost_aware_{annualized_target}.pickle")
 
+    print("Running robust Markowitz")
     robust_result = run_backtest(robust_markowitz, sigma_target, verbose=True)
     robust_result.save(f"checkpoints/robust_{annualized_target}.pickle")
 
+    print("Running weight-limited Markowitz")
     weight_limited_result = run_backtest(
         weight_limits_markowitz, sigma_target, verbose=True
     )
     weight_limited_result.save(f"checkpoints/weight_limited_{annualized_target}.pickle")
 
-    long_only_result = run_backtest(long_only_markowitz, sigma_target, verbose=True)
-    long_only_result.save(f"checkpoints/long_only_{annualized_target}.pickle")
-
 
 def generate_table(
     equal_weights_results: BacktestResult,
     unconstrained_results: BacktestResult,
-    long_only_results: BacktestResult,
     weight_limited_result: BacktestResult,
     leverage_limit_result: BacktestResult,
     turnover_limit_result: BacktestResult,
@@ -234,9 +233,8 @@ def generate_table(
     # Table 1
     df = pd.DataFrame(
         index=[
-            "Equal weights",
+            "Equal weight",
             "Unconstrained",
-            "Long-only",
             "Weight-limited",
             "Leverage-limited",
             "Turnover-limited",
@@ -255,7 +253,6 @@ def generate_table(
     strategies = [
         equal_weights_results,
         unconstrained_results,
-        long_only_results,
         weight_limited_result,
         leverage_limit_result,
         turnover_limit_result,
