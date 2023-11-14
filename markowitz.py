@@ -60,6 +60,98 @@ class Parameters:
     gamma_leverage: float  # leverage gamma
 
 
+@dataclass
+class HyperParameters:
+    gamma_hold: float
+    gamma_trade: float
+    gamma_turn: float
+    gamma_leverage: float
+    gamma_risk: float
+
+
+@dataclass
+class Targets:
+    T_target: float
+    L_target: float
+    risk_target: float
+
+
+@dataclass
+class Limits:
+    T_max: float
+    L_max: float
+    risk_max: float
+
+
+def markowitz_old(
+    data: Data, param: Parameters
+) -> tuple[np.ndarray, float, cp.Problem]:
+    """
+    Markowitz portfolio optimization.
+    This function contains the code listing for the accompanying paper.
+    """
+
+    w, c = cp.Variable(data.n_assets), cp.Variable()
+
+    z = w - data.w_prev
+    T = cp.norm1(z)
+    L = cp.norm1(w)
+
+    # worst-case (robust) return
+    factor_return = (data.F @ data.factor_mean).T @ w
+    idio_return = data.idio_mean @ w
+    mean_return = factor_return + idio_return + data.risk_free * c
+    return_uncertainty = param.rho_mean @ cp.abs(w)
+    return_wc = mean_return - return_uncertainty
+
+    # asset volatilities
+    factor_volas = cp.norm2(data.F @ data.factor_covariance_chol, axis=1)
+    volas = factor_volas + data.idio_volas
+
+    # portfolio risk
+    factor_risk = cp.norm2((data.F @ data.factor_covariance_chol).T @ w)
+    idio_risk = cp.norm2(cp.multiply(data.idio_volas, w))
+    risk = cp.norm2(cp.hstack([factor_risk, idio_risk]))
+
+    # worst-case (robust) risk
+    risk_uncertainty = param.rho_covariance**0.5 * volas @ cp.abs(w)
+    risk_wc = cp.norm2(cp.hstack([risk, risk_uncertainty]))
+
+    asset_holding_cost = data.kappa_short @ cp.pos(-w)
+    cash_holding_cost = data.kappa_borrow * cp.pos(-c)
+    holding_cost = asset_holding_cost + cash_holding_cost
+
+    spread_cost = data.kappa_spread @ cp.abs(z)
+    impact_cost = data.kappa_impact @ cp.power(cp.abs(z), 3 / 2)
+    trading_cost = spread_cost + impact_cost
+
+    objective = (
+        return_wc
+        - param.gamma_risk * cp.pos(risk_wc - param.risk_target)
+        - param.gamma_hold * holding_cost
+        - param.gamma_trade * trading_cost
+        - param.gamma_turn * cp.pos(T - param.T_max)
+    )
+
+    constraints = [
+        cp.sum(w) + c == 1,
+        c == data.c_prev - cp.sum(z),
+        param.c_lower <= c,
+        c <= param.c_upper,
+        param.w_lower <= w,
+        w <= param.w_upper,
+        param.z_lower <= z,
+        z <= param.z_upper,
+        L <= param.L_max,
+        T <= param.T_max,
+    ]
+
+    problem = cp.Problem(cp.Maximize(objective), constraints)
+    problem.solve()
+    assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
+    return w.value, c.value, problem
+
+
 def markowitz(
     data: Data,
     param: Parameters,
