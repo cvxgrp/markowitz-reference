@@ -98,11 +98,11 @@ def markowitz(
 
     asset_holding_cost = data.kappa_short @ cp.pos(-w)
     cash_holding_cost = data.kappa_borrow * cp.pos(-c)
-    asset_holding_cost + cash_holding_cost
+    holding_cost = asset_holding_cost + cash_holding_cost
 
     spread_cost = data.kappa_spread @ cp.abs(z)
     impact_cost = data.kappa_impact @ cp.power(cp.abs(z), 3 / 2)
-    spread_cost + impact_cost
+    trading_cost = spread_cost + impact_cost
 
     constraints = [
         cp.sum(w) + c == 1,
@@ -134,15 +134,15 @@ def markowitz(
     objective = (
         return_wc
         - param.gamma_risk * cp.pos(risk_wc - param.risk_target)
-        # - param.gamma_hold * holding_cost
-        # - param.gamma_trade * trading_cost
-        # - param.gamma_turn * cp.pos(T - param.T_target)
-        # - param.gamma_leverage * cp.pos(L - param.L_target)
+        - param.gamma_hold * holding_cost
+        - param.gamma_trade * trading_cost
+        - param.gamma_turn * cp.pos(T - param.T_target)
+        - param.gamma_leverage * cp.pos(L - param.L_target)
     )
 
     problem = cp.Problem(cp.Maximize(objective), constraints)
     try:
-        problem.solve(solver="MOSEK")
+        problem.solve(solver="MOSEK", verbose=False)
     except cp.SolverError:
         print("SolverError")
         print(problem.status)

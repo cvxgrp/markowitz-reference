@@ -27,57 +27,57 @@ class Limits:
     risk_max: float
 
 
+# def get_data_and_parameters(
+#     inputs: callable, hyperparameters: callable, targets: callable, limits: callable
+# ):
+#     # L_max = 1.6
+#     # T_max = 10 / 252
+#     # risk_target = inputs.risk_target
+#     n_assets = inputs.n_assets
+#     latest_prices = inputs.prices.iloc[-1]
+#     portfolio_value = inputs.cash + inputs.quantities @ latest_prices
+
+#     data = Data(
+#         w_prev=(inputs.quantities * latest_prices / portfolio_value).values,
+#         c_prev=(inputs.cash / portfolio_value),
+#         idio_mean=np.zeros(n_assets),
+#         factor_mean=inputs.mean.values,
+#         risk_free=0,
+#         factor_covariance_chol=np.linalg.cholesky(inputs.covariance.values),
+#         idio_volas=np.zeros(n_assets),
+#         F=np.eye(n_assets),
+#         kappa_short=np.zeros(n_assets),
+#         kappa_borrow=0.0,
+#         kappa_spread=np.zeros(n_assets),
+#         kappa_impact=np.zeros(n_assets),
+#     )
+
+#     param = Parameters(
+#         w_lower=-np.ones(data.n_assets) * 0.05,
+#         w_upper=np.ones(data.n_assets) * 0.1,
+#         c_lower=-0.05,
+#         c_upper=1,
+#         z_lower=-np.ones(data.n_assets) * 1e3,
+#         z_upper=np.ones(data.n_assets) * 1e3,
+#         T_max=1e3,
+#         T_target=0,
+#         L_max=1e3,
+#         L_target=0,
+#         rho_mean=np.zeros(n_assets),
+#         rho_covariance=0,
+#         gamma_hold=0,
+#         gamma_trade=0,
+#         gamma_turn=0,
+#         gamma_risk=5.0,
+#         risk_max=1e3,
+#         risk_target=0.1 / np.sqrt(252),
+#         gamma_leverage=0,
+#     )
+
+#     return data, param
+
+
 def get_data_and_parameters(
-    inputs: callable, hyperparameters: callable, targets: callable, limits: callable
-):
-    # L_max = 1.6
-    # T_max = 10 / 252
-    # risk_target = inputs.risk_target
-    n_assets = inputs.n_assets
-    latest_prices = inputs.prices.iloc[-1]
-    portfolio_value = inputs.cash + inputs.quantities @ latest_prices
-
-    data = Data(
-        w_prev=(inputs.quantities * latest_prices / portfolio_value).values,
-        c_prev=(inputs.cash / portfolio_value),
-        idio_mean=np.zeros(n_assets),
-        factor_mean=inputs.mean.values,
-        risk_free=0,
-        factor_covariance_chol=np.linalg.cholesky(inputs.covariance.values),
-        idio_volas=np.zeros(n_assets),
-        F=np.eye(n_assets),
-        kappa_short=np.zeros(n_assets),
-        kappa_borrow=0.0,
-        kappa_spread=np.zeros(n_assets),
-        kappa_impact=np.zeros(n_assets),
-    )
-
-    param = Parameters(
-        w_lower=-np.ones(data.n_assets) * 0.05,
-        w_upper=np.ones(data.n_assets) * 0.1,
-        c_lower=-0.05,
-        c_upper=1,
-        z_lower=-np.ones(data.n_assets) * 1e3,
-        z_upper=np.ones(data.n_assets) * 1e3,
-        T_max=1e3,
-        T_target=0,
-        L_max=1e3,
-        L_target=0,
-        rho_mean=np.zeros(n_assets),
-        rho_covariance=0,
-        gamma_hold=0,
-        gamma_trade=0,
-        gamma_turn=0,
-        gamma_risk=5.0,
-        risk_max=1e3,
-        risk_target=0.1 / np.sqrt(252),
-        gamma_leverage=0,
-    )
-
-    return data, param
-
-
-def get_data_and_parameters2(
     inputs: callable, hyperparameters: callable, targets: callable, limits: callable
 ):
     # L_max = 1.6
