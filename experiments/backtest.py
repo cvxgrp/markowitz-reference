@@ -166,6 +166,7 @@ def run_markowitz(
     # prices, spread, volume, rf = load_data()
     n_assets = prices.shape[1]
     lookback = 500
+    forward_smoothing = 5
 
     post_trade_cash = []
     post_trade_quantities = []
@@ -203,7 +204,11 @@ def run_markowitz(
 
     returns = prices.pct_change().dropna()
     means = (
-        synthetic_returns(prices, information_ratio=0.07).shift(-1).dropna()
+        synthetic_returns(
+            prices, information_ratio=0.15, forward_smoothing=forward_smoothing
+        )
+        .shift(-1)
+        .dropna()
     )  # At time t includes data up to t+1
     covariance_df = returns.ewm(halflife=125).cov()  # At time t includes data up to t
     days = returns.index
@@ -277,7 +282,7 @@ def run_markowitz(
     # quantities = dollar_investment / prices_0.iloc[-1]
     # cash = 1e6 * c
 
-    for t in range(lookback, len(prices) - 1):
+    for t in range(lookback, len(prices) - forward_smoothing):
         start_time = time.perf_counter()
         day = prices.index[t]
 
@@ -339,9 +344,13 @@ def run_markowitz(
         else:
             timings.append(None)
 
-    post_trade_cash = pd.Series(post_trade_cash, index=prices.index[lookback:-1])
+    post_trade_cash = pd.Series(
+        post_trade_cash, index=prices.index[lookback:-forward_smoothing]
+    )
     post_trade_quantities = pd.DataFrame(
-        post_trade_quantities, index=prices.index[lookback:-1], columns=prices.columns
+        post_trade_quantities,
+        index=prices.index[lookback:-forward_smoothing],
+        columns=prices.columns,
     )
 
     return (
