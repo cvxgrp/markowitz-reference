@@ -1,7 +1,9 @@
 import numpy as np
-import cvxpy as cp
+import pandas as pd
 from markowitz import Data, Parameters, markowitz
 from dataclasses import dataclass
+
+from backtest import run_markowitz, load_data
 
 
 @dataclass
@@ -27,62 +29,16 @@ class Limits:
     risk_max: float
 
 
-# def get_data_and_parameters(
-#     inputs: callable, hyperparameters: callable, targets: callable, limits: callable
-# ):
-#     # L_max = 1.6
-#     # T_max = 10 / 252
-#     # risk_target = inputs.risk_target
-#     n_assets = inputs.n_assets
-#     latest_prices = inputs.prices.iloc[-1]
-#     portfolio_value = inputs.cash + inputs.quantities @ latest_prices
-
-#     data = Data(
-#         w_prev=(inputs.quantities * latest_prices / portfolio_value).values,
-#         c_prev=(inputs.cash / portfolio_value),
-#         idio_mean=np.zeros(n_assets),
-#         factor_mean=inputs.mean.values,
-#         risk_free=0,
-#         factor_covariance_chol=np.linalg.cholesky(inputs.covariance.values),
-#         idio_volas=np.zeros(n_assets),
-#         F=np.eye(n_assets),
-#         kappa_short=np.zeros(n_assets),
-#         kappa_borrow=0.0,
-#         kappa_spread=np.zeros(n_assets),
-#         kappa_impact=np.zeros(n_assets),
-#     )
-
-#     param = Parameters(
-#         w_lower=-np.ones(data.n_assets) * 0.05,
-#         w_upper=np.ones(data.n_assets) * 0.1,
-#         c_lower=-0.05,
-#         c_upper=1,
-#         z_lower=-np.ones(data.n_assets) * 1e3,
-#         z_upper=np.ones(data.n_assets) * 1e3,
-#         T_max=1e3,
-#         T_target=0,
-#         L_max=1e3,
-#         L_target=0,
-#         rho_mean=np.zeros(n_assets),
-#         rho_covariance=0,
-#         gamma_hold=0,
-#         gamma_trade=0,
-#         gamma_turn=0,
-#         gamma_risk=5.0,
-#         risk_max=1e3,
-#         risk_target=0.1 / np.sqrt(252),
-#         gamma_leverage=0,
-#     )
-
-#     return data, param
-
-
 def get_data_and_parameters(
-    inputs: callable, hyperparameters: callable, targets: callable, limits: callable
+    inputs: callable, hyperparameters: dataclass, targets: dataclass, limits: dataclass
 ):
-    # L_max = 1.6
-    # T_max = 10 / 252
-    # risk_target = inputs.risk_target
+    """
+    param inputs: OptimizationInputs object
+    param hyperparameters: HyperParameters object (gamma_hold, gamma_trade,
+    gamma_turn, gamma_leverage, gamma_risk)
+    param targets: Targets object (T_target, L_target, risk_target)
+    param limits: Limits object (T_max, L_max, risk_max)
+    """
 
     spread_prediction = inputs.spread.iloc[-5:].mean().values
 
@@ -148,68 +104,79 @@ def get_data_and_parameters(
     return data, param
 
 
-def initialize_markowitz(inputs, hyperparameters, targets, limits):
-    n_assets = inputs.n_assets
+def full_markowitz(inputs, hyperparamters, targets, limits):
+    """
+    param inputs: OptimizationInputs object
+    param hyperparameters: HyperParameters object (gamma_hold, gamma_trade,
+    gamma_turn, gamma_leverage, gamma_risk)
+    param targets: Targets object (T_target, L_target, risk_target)
+    param limits: Limits object (T_max, L_max, risk_max)
 
-    w_lower = -0.1
-    w_upper = 0.15
-    c_lower = 0
-    c_upper = 0
-    z_lower = -1e3
-    z_upper = 1e3
+    returns: w, c, problem, problem_solved
+    """
 
-    rho_covariance = 0.02
-    rho_mean = 0.0
-
-    data = Data(
-        w_prev=(1 / n_assets) * np.ones(n_assets),
-        c_prev=0,
-        idio_mean=np.zeros(n_assets),
-        factor_mean=np.zeros(n_assets),
-        risk_free=0,
-        factor_covariance_chol=np.linalg.cholesky(inputs.covariance.values),
-        idio_volas=np.zeros(n_assets),
-        F=np.eye(n_assets),
-        kappa_short=np.zeros(n_assets),
-        kappa_borrow=0.0,
-        kappa_spread=np.zeros(n_assets),
-        kappa_impact=np.zeros(n_assets),
-    )
-
-    param = Parameters(
-        w_lower=w_lower,
-        w_upper=w_upper,
-        c_lower=c_lower,
-        c_upper=c_upper,
-        z_lower=z_lower * np.ones(data.n_assets),
-        z_upper=z_upper * np.ones(data.n_assets),
-        T_max=1e3,
-        L_max=limits.L_max,
-        rho_mean=np.ones(n_assets) * rho_mean,
-        rho_covariance=rho_covariance,
-        gamma_hold=0,
-        gamma_trade=0,
-        gamma_turn=0,
-        gamma_risk=1,
-        risk_target=0,
-        gamma_leverage=0,
-        risk_max=1e3,
-        T_target=0,
-        L_target=0,
-    )
+    data, param = get_data_and_parameters(inputs, hyperparamters, targets, limits)
 
     w, c, problem, problem_solved = markowitz(data, param)
     return w, c, problem, problem_solved
 
 
-def full_markowitz(inputs, hyperparamters, targets, limits, initialize=False):
-    if initialize:
-        return initialize_markowitz(inputs, hyperparamters, targets, limits)
+def main():
+    gamma_risk = 0.05
+    gamma_turn = 0.002
+    gamma_leverage = 0.0005
 
-    data, param = get_data_and_parameters(inputs, hyperparamters, targets, limits)
-    try:
-        w, c, problem, problem_solved = markowitz(data, param)
-        return w, c, problem, problem_solved
-    except cp.SolverError:
-        # print("Failed to solve markowitz")
-        return data.w_prev, data.c_prev, None, False
+    prices, _, _, _ = load_data()
+
+    gamma_turns = pd.Series(np.ones(len(prices)), index=prices.index) * gamma_turn
+    gamma_leverages = (
+        pd.Series(np.ones(len(prices)), index=prices.index) * gamma_leverage
+    )
+    gamma_risks = pd.Series(np.ones(len(prices)), index=prices.index) * gamma_risk
+
+    hyperparameters = HyperParameters(1, 1, gamma_turns, gamma_leverages, gamma_risks)
+
+    targets = Targets(
+        T_target=50 / 252,
+        L_target=1.6,
+        risk_target=0.1 / np.sqrt(252),
+    )
+    limits = Limits(
+        T_max=1e3,
+        L_max=1e3,
+        risk_max=1e3,
+    )
+
+    results, _ = run_markowitz(
+        full_markowitz,
+        targets=targets,
+        limits=limits,
+        hyperparameters=hyperparameters,
+        verbose=True,
+    )
+
+    metrics = pd.Series(
+        index=[
+            "Mean return",
+            "Volatility",
+            "Sharpe",
+            "Turnover",
+            "Leverage",
+            "Drawdown",
+        ]
+    )
+
+    metrics["Mean return"] = results.mean_return
+    metrics["Volatility"] = results.volatility
+    metrics["Sharpe"] = results.sharpe
+    metrics["Turnover"] = results.turnover
+    metrics["Leverage"] = results.max_leverage
+    metrics["Drawdown"] = results.max_drawdown
+
+    print(metrics)
+    # save file
+    metrics.to_csv("full_markowitz_metrics.csv")
+
+
+if __name__ == "__main__":
+    main()

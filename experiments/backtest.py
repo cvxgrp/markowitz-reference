@@ -11,6 +11,7 @@ import numpy as np
 import cvxpy as cp
 import pandas as pd
 from utils import synthetic_returns
+from collections import namedtuple
 
 # hack to allow importing from parent directory without having a package
 sys.path.append(str(Path(__file__).parent.parent))
@@ -146,30 +147,36 @@ def run_backtest(
 
 def run_markowitz(
     strategy: callable,
-    prices,
-    spread,
-    volume,
-    rf,
-    # risk_target,
-    targets,
-    limits,
-    hyperparameters,
-    # hard=True,
+    targets: namedtuple,
+    limits: namedtuple,
+    hyperparameters: namedtuple,
     verbose: bool = False,
 ) -> tuple[pd.Series, pd.DataFrame]:
     """
     Run a simplified backtest for a given strategy.
     At time t we use data from t-lookback to t to compute the optimal portfolio
     weights and then execute the trades at time t.
+
+    param strategy: a function that takes an OptimizationInput and returns
+    w, c, problem, problem_solved
+    param prices: a DataFrame of prices
+    param spread: a DataFrame of bid-ask spreads
+    param volume: a DataFrame of trading volumes
+    param rf: a Series of risk-free rates
+    param targets: a namedtuple of targets (T_target, L_target, risk_target)
+    param limits: a namedtuple of limits (T_max, L_max, risk_max)
+    param hyperparameters: a namedtuple of hyperparameters (gamma_hold,
+    gamma_trade, gamma_turn, gamma_risk, gamma_leverage)
+    param verbose: whether to print progress
+
+    return: tuple of BacktestResult instance and DataFrame of dual optimal values
     """
 
-    # prices, spread, volume, rf = load_data()
+    prices, spread, volume, rf = load_data()
+
     n_assets = prices.shape[1]
     lookback = 500
     forward_smoothing = 5
-
-    post_trade_cash = []
-    post_trade_quantities = []
 
     constraint_names = [
         "FullInvestment",
@@ -184,21 +191,6 @@ def run_markowitz(
         "Turnover",
         "Risk",
     ]
-
-    # if hard:
-    #     constraint_names += [
-    #         "Leverage",
-    #         "Turnover",
-    #         "Risk",
-    #     ]
-
-    dual_optimals = (
-        pd.DataFrame(
-            columns=constraint_names,
-            index=prices.index[lookback:-1],
-        )
-        * np.nan
-    )
 
     timings = []
 
@@ -216,71 +208,19 @@ def run_markowitz(
     for day in days:
         covariances[day] = covariance_df.loc[day]
 
-    # Initialize portfolio
-    # quantities = initial_quantities
-    # cash = initial_cash
-
-    # prices_0 = prices.iloc[lookback - 1]
-    # w = np.ones(n_assets) / (n_assets)
-    # c = 0
-
-    # inputs_0 = OptimizationInput(
-    #     prices.iloc[: lookback - 1],
-    #     None,
-    #     returns.iloc[: lookback - 1].cov(),
-    #     None,
-    #     None,
-    #     None,
-    #     None,
-    #     None,
-    #     None,
-    # )
-
-    # w, c, problem, problem_solved = strategy(
-    #     inputs_0, hyperparameters, targets=targets, limits=limits, initialize=True
-    # )
-    # # get quantitites from w
-    # quantities = w * 1e6 / prices_0.iloc[-1]
-    # cash = 1e6 * c
-
     quantities = np.zeros(n_assets)
     cash = 1e6
 
-    # quantities = w * 1e6 / prices_0
-    # cash = 1e6 * c
-
-    # quantities = np.ones(n_assets) * (1 / prices_0)
-    # / np.sum(1 / prices_0) * 1e6 * (n_assets / (n_assets + 1))
-    # cash = 0
-
-    # prices_0 = prices.iloc[:lookback]
-    # spread_0 = spread.iloc[:lookback]
-    # volume_0 = volume.iloc[:lookback]
-
-    # day0 = prices.index[lookback - 1]
-    # mean_0 = 0 * means.loc[day0]
-    # # Forecast for return t to t+1
-    # covariance_0 = covariances[day0]
-    # # Forecast for covariance t to t+1
-
-    # inputs_0 = OptimizationInput(
-    #     prices_0,
-    #     mean_0,
-    #     covariance_0,
-    #     spread_0,
-    #     volume_0,
-    #     quantities,
-    #     cash,
-    #     risk_target,
-    #     rf.iloc[lookback - 1],
-    # )
-    # w, c, problem, problem_solved =
-    # strategy(inputs_0, hyperparameters,
-    #  initialize=True, hard=False)
-
-    # dollar_investment = w * 1e6
-    # quantities = dollar_investment / prices_0.iloc[-1]
-    # cash = 1e6 * c
+    # To store results
+    post_trade_cash = []
+    post_trade_quantities = []
+    dual_optimals = (
+        pd.DataFrame(
+            columns=constraint_names,
+            index=prices.index[lookback:-1],
+        )
+        * np.nan
+    )
 
     for t in range(lookback, len(prices) - forward_smoothing):
         start_time = time.perf_counter()
@@ -307,12 +247,6 @@ def run_markowitz(
             limits.risk_max,
             rf.iloc[t],
         )
-
-        # risk = np.sqrt(
-        #     cp.quad_form(w, covariance_t).value
-        # ) * np.sqrt(252)
-        # print(risk)
-        # assert False
 
         w, _, problem, problem_solved = strategy(
             inputs_t, hyperparameters, targets=targets, limits=limits

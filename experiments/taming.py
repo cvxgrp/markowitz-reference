@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import cvxpy as cp
 from backtest import BacktestResult, OptimizationInput, Timing, run_backtest
-from markowitz import Data, Parameters, markowitz
+from markowitz import Data, Parameters, markowitz_old
 import matplotlib.pyplot as plt
 
 
@@ -58,21 +58,21 @@ def weight_limits_markowitz(inputs: OptimizationInput) -> np.ndarray:
     param.c_upper = 1.0
     param.risk_target = inputs.risk_target
     param.gamma_risk = 5.0
-    return markowitz(data, param)
+    return markowitz_old(data, param)
 
 
 def leverage_limit_markowitz(inputs: OptimizationInput) -> np.ndarray:
     data, param = get_unconstrained_data_and_parameters(inputs)
 
     param.L_max = 1.6
-    return markowitz(data, param)
+    return markowitz_old(data, param)
 
 
 def turnover_limit_markowitz(inputs: OptimizationInput) -> np.ndarray:
     data, param = get_unconstrained_data_and_parameters(inputs)
 
-    param.T_max = 10 / 252  # Maximum TO per year
-    return markowitz(data, param)
+    param.T_max = 50 / 252  # Maximum TO per year
+    return markowitz_old(data, param)
 
 
 def robust_markowitz(inputs: OptimizationInput) -> np.ndarray:
@@ -81,7 +81,7 @@ def robust_markowitz(inputs: OptimizationInput) -> np.ndarray:
         inputs.n_assets
     )
     param.rho_covariance = 0.04
-    return markowitz(data, param)
+    return markowitz_old(data, param)
 
 
 def cost_aware_markowitz(inputs: OptimizationInput) -> np.ndarray:
@@ -90,7 +90,7 @@ def cost_aware_markowitz(inputs: OptimizationInput) -> np.ndarray:
     data.kappa_spread = (inputs.spread.iloc[-1] * 0.5).values
     data.risk_free = inputs.risk_free
     param.gamma_trade = 10.0
-    return markowitz(data, param)
+    return markowitz_old(data, param)
 
 
 def get_unconstrained_data_and_parameters(
@@ -135,7 +135,31 @@ def get_unconstrained_data_and_parameters(
         gamma_turn=0.0,
         gamma_risk=gamma_risk,
         risk_target=inputs.risk_target,
+        risk_max=1e3,
+        gamma_leverage=0.0,
+        T_target=0.0,
+        L_target=0.0,
     )
+
+    #  w_lower: np.ndarray  # (n_assets,) array of lower bounds on asset weights
+    # w_upper: np.ndarray  # (n_assets,) array of upper bounds on asset weights
+    # c_lower: float  # lower bound on cash weight
+    # c_upper: float  # upper bound on cash weight
+    # z_lower: np.ndarray  # (n_assets,) array of lower bounds on trades
+    # z_upper: np.ndarray  # (n_assets,) array of upper bounds on trades
+    # T_target: float  # turnover target
+    # T_max: float  # turnover limit
+    # L_target: float  # leverage target
+    # L_max: float  # leverage limit
+    # risk_target: float  # risk target as volatility
+    # risk_max: float  # risk limit as volatility
+    # rho_mean: np.ndarray  # (n_assets,) array of mean returns for rho
+    # rho_covariance: float  # uncertainty in covariance matrix
+    # gamma_hold: float  # holding cost
+    # gamma_trade: float  # trading cost
+    # gamma_turn: float  # turnover cost
+    # gamma_risk: float  # risk cost
+    # gamma_leverage: float  # leverage gamma
     return data, param
 
 
