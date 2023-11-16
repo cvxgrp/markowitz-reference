@@ -41,6 +41,7 @@ def get_data_and_parameters(
     """
 
     spread_prediction = inputs.spread.iloc[-5:].mean().values
+    volume_prediction = inputs.volume.iloc[-5:].mean().values
 
     w_lower = -0.1
     w_upper = 0.15
@@ -60,9 +61,19 @@ def get_data_and_parameters(
     t = latest_prices.name
     gamma_hold = hyperparameters.gamma_hold
     gamma_trade = hyperparameters.gamma_trade
-    gamma_turn = hyperparameters.gamma_turn.loc[t]
-    gamma_risk = hyperparameters.gamma_risk.loc[t]
-    gamma_leverage = hyperparameters.gamma_leverage.loc[t]
+
+    if type(hyperparameters.gamma_turn) == pd.Series:
+        gamma_turn = hyperparameters.gamma_turn.loc[t]
+    else:
+        gamma_turn = hyperparameters.gamma_turn
+    if type(hyperparameters.gamma_risk) == pd.Series:
+        gamma_risk = hyperparameters.gamma_risk.loc[t]
+    else:
+        gamma_risk = hyperparameters.gamma_risk
+    if type(hyperparameters.gamma_leverage) == pd.Series:
+        gamma_leverage = hyperparameters.gamma_leverage.loc[t]
+    else:
+        gamma_leverage = hyperparameters.gamma_leverage
 
     data = Data(
         w_prev=(inputs.quantities * latest_prices / portfolio_value),
@@ -76,7 +87,7 @@ def get_data_and_parameters(
         kappa_short=np.ones(n_assets) * 3 * (0.01) ** 2,  # 7.5% yearly
         kappa_borrow=inputs.risk_free,
         kappa_spread=np.ones(n_assets) * spread_prediction / 2,
-        kappa_impact=np.zeros(n_assets),
+        kappa_impact=np.ones(n_assets) * volume_prediction,
     )
 
     param = Parameters(

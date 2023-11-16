@@ -150,6 +150,10 @@ def run_markowitz(
     targets: namedtuple,
     limits: namedtuple,
     hyperparameters: namedtuple,
+    prices=None,
+    spread=None,
+    volume=None,
+    rf=None,
     verbose: bool = False,
 ) -> tuple[pd.Series, pd.DataFrame]:
     """
@@ -172,7 +176,8 @@ def run_markowitz(
     return: tuple of BacktestResult instance and DataFrame of dual optimal values
     """
 
-    prices, spread, volume, rf = load_data()
+    if prices is None:
+        prices, spread, volume, rf = load_data()
 
     n_assets = prices.shape[1]
     lookback = 500
