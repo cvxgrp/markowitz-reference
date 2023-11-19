@@ -118,7 +118,7 @@ def get_basic_data_and_parameters(
     return data, param
 
 
-def main(from_checkpoint: bool = True):
+def main(from_checkpoint: bool = False):
     annualized_target = 0.13
 
     if not from_checkpoint:
