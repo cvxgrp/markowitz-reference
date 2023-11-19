@@ -1,9 +1,8 @@
 import numpy as np
 import pandas as pd
 import cvxpy as cp
-from backtest import BacktestResult, OptimizationInput, Timing, run_backtest
+from backtest import BacktestResult, OptimizationInput, run_backtest
 from markowitz import Data, Parameters, markowitz
-import matplotlib.pyplot as plt
 
 
 def unconstrained_markowitz(
@@ -71,7 +70,7 @@ def leverage_limit_markowitz(inputs: OptimizationInput) -> np.ndarray:
 def turnover_limit_markowitz(inputs: OptimizationInput) -> np.ndarray:
     data, param = get_unconstrained_data_and_parameters(inputs)
 
-    param.T_max = 10 / 252  # Maximum TO per year
+    param.T_max = 50 / 252  # Maximum TO per year
     return markowitz(data, param)
 
 
@@ -80,7 +79,7 @@ def robust_markowitz(inputs: OptimizationInput) -> np.ndarray:
     param.rho_mean = np.percentile(np.abs(inputs.mean.values), 20, axis=0) * np.ones(
         inputs.n_assets
     )
-    param.rho_covariance = 0.04
+    param.rho_covariance = 0.02
     return markowitz(data, param)
 
 
@@ -234,7 +233,7 @@ def generate_table(
     df = pd.DataFrame(
         index=[
             "Equal weight",
-            "Unconstrained",
+            "Basic Markowitz",
             "Weight-limited",
             "Leverage-limited",
             "Turnover-limited",
@@ -271,8 +270,8 @@ def generate_table(
         "Mean return": lambda x: rf"{100 * x:.1f}\%",
         "Volatility": lambda x: rf"{100 * x:.1f}\%",
         "Sharpe": lambda x: f"{x:.2f}",
-        "Turnover": lambda x: f"{x:.2f}",
-        "Leverage": lambda x: f"{x:.2f}",
+        "Turnover": lambda x: f"{x:.1f}",
+        "Leverage": lambda x: f"{x:.1f}",
         "Drawdown": lambda x: rf"{100 * x:.1f}\%",
     }
 
@@ -281,56 +280,6 @@ def generate_table(
             formatters=formatters,
         )
     )
-
-
-def plot_timings(timings: list[Timing]) -> None:
-    # Stacked area plot of cvxpy, solver, and other times
-    plt.figure()
-    plt.stackplot(
-        range(len(timings)),
-        [timing.cvxpy for timing in timings],
-        [timing.solver for timing in timings],
-        [timing.other for timing in timings],
-        labels=["CVXPY", "Solver", "Other"],
-    )
-    plt.xlabel("Day of backtest")
-    plt.ylabel("Time (s)")
-    plt.legend()
-    plt.show()
-
-
-def plot_results(
-    equal_weights_results: BacktestResult,
-    unconstrained_results: list[BacktestResult],
-    long_only_results: list[BacktestResult],
-) -> None:
-    # E-V plot
-    plt.figure()
-
-    # Single star for equal weights
-    plt.scatter(
-        equal_weights_results.volatility,
-        equal_weights_results.mean_return,
-        marker="*",
-        s=200,
-        c="r",
-        label="Equal weights",
-    )
-
-    # Circle for unconstrained Markowitz frontier as line with circles
-    unconstrained_volatility = [result.volatility for result in unconstrained_results]
-    unconstrained_mean_return = [result.mean_return for result in unconstrained_results]
-    plt.plot(
-        unconstrained_volatility,
-        unconstrained_mean_return,
-        "o-",
-        label="Unconstrained Markowitz",
-    )
-
-    plt.xlabel("Volatility")
-    plt.ylabel("Mean return")
-    plt.legend()
-    plt.show()
 
 
 def get_solver():
