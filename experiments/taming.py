@@ -1,9 +1,8 @@
 import numpy as np
 import pandas as pd
 import cvxpy as cp
-from backtest import BacktestResult, OptimizationInput, Timing, run_backtest
+from backtest import BacktestResult, OptimizationInput, run_backtest
 from markowitz import Data, Parameters, markowitz
-import matplotlib.pyplot as plt
 
 
 def unconstrained_markowitz(
@@ -71,15 +70,16 @@ def leverage_limit_markowitz(inputs: OptimizationInput) -> np.ndarray:
 def turnover_limit_markowitz(inputs: OptimizationInput) -> np.ndarray:
     data, param = get_unconstrained_data_and_parameters(inputs)
 
-    param.T_max = 10 / 252  # Maximum TO per year
+    param.T_max = 50 / 252  # Maximum TO per year
     return markowitz(data, param)
 
 
 def robust_markowitz(inputs: OptimizationInput) -> np.ndarray:
     data, param = get_unconstrained_data_and_parameters(inputs)
-
-    param.rho_mean = np.abs(0.1 * inputs.mean.values)
-    param.rho_covariance = 0.04
+    param.rho_mean = np.percentile(np.abs(inputs.mean.values), 20, axis=0) * np.ones(
+        inputs.n_assets
+    )
+    param.rho_covariance = 0.02
     return markowitz(data, param)
 
 
@@ -191,11 +191,13 @@ def run_all_strategies(annualized_target: float) -> None:
     adjustment_factor = np.sqrt(equal_weights_results.periods_per_year)
     sigma_target = annualized_target / adjustment_factor
 
+    print("Running unconstrained Markowitz")
     unconstrained_result = run_backtest(
         unconstrained_markowitz, sigma_target, verbose=True
     )
     unconstrained_result.save(f"checkpoints/unconstrained_{annualized_target}.pickle")
 
+    print("Running leverage limit Markowitz")
     leverage_limit_result = run_backtest(
         leverage_limit_markowitz, sigma_target, verbose=True
     )
@@ -206,12 +208,15 @@ def run_all_strategies(annualized_target: float) -> None:
     )
     turnover_limit_result.save(f"checkpoints/turnover_limit_{annualized_target}.pickle")
 
+    print("Running cost-aware Markowitz")
     cost_aware_result = run_backtest(cost_aware_markowitz, sigma_target, verbose=True)
     cost_aware_result.save(f"checkpoints/cost_aware_{annualized_target}.pickle")
 
+    print("Running robust Markowitz")
     robust_result = run_backtest(robust_markowitz, sigma_target, verbose=True)
     robust_result.save(f"checkpoints/robust_{annualized_target}.pickle")
 
+    print("Running weight-limited Markowitz")
     weight_limited_result = run_backtest(
         weight_limits_markowitz, sigma_target, verbose=True
     )
@@ -234,9 +239,8 @@ def generate_table(
     # Table 1
     df = pd.DataFrame(
         index=[
-            "Equal weights",
-            "Unconstrained",
-            "Long-only",
+            "Equal weight",
+            "Basic Markowitz",
             "Weight-limited",
             "Leverage-limited",
             "Turnover-limited",
@@ -274,8 +278,8 @@ def generate_table(
         "Mean return": lambda x: rf"{100 * x:.1f}\%",
         "Volatility": lambda x: rf"{100 * x:.1f}\%",
         "Sharpe": lambda x: f"{x:.2f}",
-        "Turnover": lambda x: f"{x:.2f}",
-        "Leverage": lambda x: f"{x:.2f}",
+        "Turnover": lambda x: f"{x:.1f}",
+        "Leverage": lambda x: f"{x:.1f}",
         "Drawdown": lambda x: rf"{100 * x:.1f}\%",
     }
 
@@ -284,56 +288,6 @@ def generate_table(
             formatters=formatters,
         )
     )
-
-
-def plot_timings(timings: list[Timing]) -> None:
-    # Stacked area plot of cvxpy, solver, and other times
-    plt.figure()
-    plt.stackplot(
-        range(len(timings)),
-        [timing.cvxpy for timing in timings],
-        [timing.solver for timing in timings],
-        [timing.other for timing in timings],
-        labels=["CVXPY", "Solver", "Other"],
-    )
-    plt.xlabel("Day of backtest")
-    plt.ylabel("Time (s)")
-    plt.legend()
-    plt.show()
-
-
-def plot_results(
-    equal_weights_results: BacktestResult,
-    unconstrained_results: list[BacktestResult],
-    long_only_results: list[BacktestResult],
-) -> None:
-    # E-V plot
-    plt.figure()
-
-    # Single star for equal weights
-    plt.scatter(
-        equal_weights_results.volatility,
-        equal_weights_results.mean_return,
-        marker="*",
-        s=200,
-        c="r",
-        label="Equal weights",
-    )
-
-    # Circle for unconstrained Markowitz frontier as line with circles
-    unconstrained_volatility = [result.volatility for result in unconstrained_results]
-    unconstrained_mean_return = [result.mean_return for result in unconstrained_results]
-    plt.plot(
-        unconstrained_volatility,
-        unconstrained_mean_return,
-        "o-",
-        label="Unconstrained Markowitz",
-    )
-
-    plt.xlabel("Volatility")
-    plt.ylabel("Mean return")
-    plt.legend()
-    plt.show()
 
 
 def get_solver():

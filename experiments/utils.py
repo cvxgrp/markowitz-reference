@@ -12,11 +12,13 @@ def synthetic_returns(prices: pd.DataFrame, information_ratio: float) -> pd.Data
     coefficient that minimize the variance of the prediction error under the
     above model.
     """
+    rng = np.random.default_rng(1)
+
     returns = prices.pct_change()
     var_r = returns.var()
 
     alpha = information_ratio**2
     var_eps = var_r * (1 - alpha) / alpha
-    noise = np.random.normal(0, np.sqrt(var_eps), size=returns.shape)
+    noise = rng.normal(0, np.sqrt(var_eps), size=returns.shape)
     synthetic_returns = alpha * (returns + noise)
     return synthetic_returns
