@@ -148,6 +148,7 @@ def markowitz_old(
 
     problem = cp.Problem(cp.Maximize(objective), constraints)
     problem.solve()
+
     assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
     return w.value, c.value, problem
 

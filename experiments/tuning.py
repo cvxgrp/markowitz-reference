@@ -40,22 +40,35 @@ def get_data_and_parameters(
     param limits: Limits object (T_max, L_max, risk_max)
     """
 
-    spread_prediction = inputs.spread.iloc[-5:].mean().values
-    volume_prediction = inputs.volume.iloc[-5:].mean().values
+    # TODO: correct??? We do not know the spread and volume of the last day,
+    # right? It's a bit weird, becaus we assume knowledge of the price...
+    latest_prices = inputs.prices.iloc[-1]
+    portfolio_value = inputs.cash + inputs.quantities @ latest_prices
+
+    spread_prediction = inputs.spread.iloc[-6:-1].mean().values
+    volume_prediction = inputs.volume.iloc[-6:-1].mean().values / portfolio_value
+    volatilities = np.diag(inputs.covariance.values) ** 0.5
+    kappa_impact = volatilities / (volume_prediction**0.5)
+
+    # print(111, (pd.Series(volume_prediction) == 0).sum())
+    # print(1, volatilities)
+    # print(2, volume_prediction)
+    # print(3, kappa_impact)
+    # print(43243, portfolio_value)
+
+    # print(kappa_impact)
 
     w_lower = -0.1
     w_upper = 0.15
     c_lower = -0.3
     c_upper = 1
-    z_lower = -0.1
-    z_upper = 0.1
+    z_lower = -0.05
+    z_upper = 0.05
 
     rho_covariance = 0.02
     rho_mean = 0.0
 
     n_assets = inputs.n_assets
-    latest_prices = inputs.prices.iloc[-1]
-    portfolio_value = inputs.cash + inputs.quantities @ latest_prices
 
     # Hyperparameters
     t = latest_prices.name
@@ -87,7 +100,7 @@ def get_data_and_parameters(
         kappa_short=np.ones(n_assets) * 3 * (0.01) ** 2,  # 7.5% yearly
         kappa_borrow=inputs.risk_free,
         kappa_spread=np.ones(n_assets) * spread_prediction / 2,
-        kappa_impact=np.ones(n_assets) * volume_prediction,
+        kappa_impact=kappa_impact,
     )
 
     param = Parameters(

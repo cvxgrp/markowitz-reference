@@ -258,14 +258,29 @@ def run_markowitz(
         )
 
         latest_prices = prices.iloc[t]  # At t
+        portfolio_value = cash + quantities @ latest_prices
         latest_spread = spread.iloc[t]
+        latest_volume = volume.iloc[t]  # / portfolio_value
+
+        # print(1, latest_volume.max())
+        # print(2, latest_volume.min())
+        latest_volas = np.diag(covariance_t) ** 0.5
 
         cash += interest_and_fees(
             cash, rf.iloc[t - 1], quantities, prices.iloc[t - 1], day
         )
         trade_quantities = create_orders(w, quantities, cash, latest_prices)
         quantities += trade_quantities
-        cash += execute_orders(latest_prices, trade_quantities, latest_spread)
+        cash += execute_orders(
+            latest_prices,
+            trade_quantities,
+            latest_spread,
+            latest_volume,
+            latest_volas,
+            portfolio_value,
+        )
+
+        # print(((np.abs(trade_quantities)*latest_prices)/volume.iloc[t]).mean())
 
         post_trade_cash.append(cash)
         post_trade_quantities.append(quantities.copy())
@@ -310,7 +325,14 @@ def create_orders(w, quantities, cash, latest_prices) -> np.array:
     return trade_quantities.values
 
 
-def execute_orders(latest_prices, trade_quantities, latest_spread) -> float:
+def execute_orders(
+    latest_prices,
+    trade_quantities,
+    latest_spread,
+    latest_volume,
+    latest_volas,
+    portfolio_value,
+) -> float:
     sell_order_quantities = np.clip(trade_quantities, None, 0)
     buy_order_quantities = np.clip(trade_quantities, 0, None)
 
@@ -320,7 +342,28 @@ def execute_orders(latest_prices, trade_quantities, latest_spread) -> float:
     sell_receipt = -sell_order_quantities @ sell_order_prices
     buy_payment = buy_order_quantities @ buy_order_prices
 
-    return sell_receipt - buy_payment
+    # market impact cost TODO: correct???
+    kappa_impact = latest_volas / (latest_volume**0.5)
+    market_cost = kappa_impact @ (
+        np.abs(trade_quantities * latest_prices) ** (3 / 2)
+    )  # * portfolio_value
+
+    # print(1, latest_volas)
+    # print(2, latest_volume)
+    # print(3, np.abs(trade_quantities).max())
+    # print(1, sell_receipt - buy_payment)
+    print(2, market_cost)
+    print(portfolio_value)
+    # print(1, latest_volas)
+    # print(2, latest_volume)
+    # print(np.abs(trade_quantities*latest_prices).sum())
+
+    # print(latest_volume)
+
+    # print(latest_volas)
+    # print(((trade_quantities*latest_prices)/portfolio_value).max())
+
+    return sell_receipt - buy_payment - market_cost
 
 
 def interest_and_fees(

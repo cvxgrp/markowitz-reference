@@ -33,7 +33,7 @@ def synthetic_returns(
 if __name__ == "__main__":
     prices = pd.read_csv("data/prices.csv", index_col=0, parse_dates=True)
     synthetic_returns = synthetic_returns(
-        prices, information_ratio=0.07, forward_smoothing=21
+        prices, information_ratio=0.15, forward_smoothing=5
     )
     returns = prices.pct_change()
     print(
