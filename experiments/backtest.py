@@ -25,7 +25,9 @@ def data_folder():
 def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     prices = pd.read_csv(data_folder() / "prices.csv", index_col=0, parse_dates=True)
     spread = pd.read_csv(data_folder() / "spreads.csv", index_col=0, parse_dates=True)
-    volume = pd.read_csv(data_folder() / "volumes.csv", index_col=0, parse_dates=True)
+    volume = pd.read_csv(
+        data_folder() / "volumes_shares.csv", index_col=0, parse_dates=True
+    )
     rf = pd.read_csv(data_folder() / "rf.csv", index_col=0, parse_dates=True).iloc[:, 0]
     return prices, spread, volume, rf
 
@@ -214,7 +216,7 @@ def run_markowitz(
         covariances[day] = covariance_df.loc[day]
 
     quantities = np.zeros(n_assets)
-    cash = 1e6
+    cash = 10 * 1e6
 
     # To store results
     post_trade_cash = []
@@ -258,13 +260,13 @@ def run_markowitz(
         )
 
         latest_prices = prices.iloc[t]  # At t
-        portfolio_value = cash + quantities @ latest_prices
+        # portfolio_value = cash + quantities @ latest_prices
         latest_spread = spread.iloc[t]
-        latest_volume = volume.iloc[t]  # / portfolio_value
+        # market_volume = volume.iloc[t]  # / portfolio_value
 
         # print(1, latest_volume.max())
         # print(2, latest_volume.min())
-        latest_volas = np.diag(covariance_t) ** 0.5
+        # latest_volas = np.diag(covariance_t) ** 0.5
 
         cash += interest_and_fees(
             cash, rf.iloc[t - 1], quantities, prices.iloc[t - 1], day
@@ -275,9 +277,9 @@ def run_markowitz(
             latest_prices,
             trade_quantities,
             latest_spread,
-            latest_volume,
-            latest_volas,
-            portfolio_value,
+            # market_volume,
+            # latest_volas,
+            # portfolio_value,
         )
 
         # print(((np.abs(trade_quantities)*latest_prices)/volume.iloc[t]).mean())
@@ -329,9 +331,8 @@ def execute_orders(
     latest_prices,
     trade_quantities,
     latest_spread,
-    latest_volume,
-    latest_volas,
-    portfolio_value,
+    # market_volume,
+    # latest_volas,
 ) -> float:
     sell_order_quantities = np.clip(trade_quantities, None, 0)
     buy_order_quantities = np.clip(trade_quantities, 0, None)
@@ -342,28 +343,17 @@ def execute_orders(
     sell_receipt = -sell_order_quantities @ sell_order_prices
     buy_payment = buy_order_quantities @ buy_order_prices
 
-    # market impact cost TODO: correct???
-    kappa_impact = latest_volas / (latest_volume**0.5)
-    market_cost = kappa_impact @ (
-        np.abs(trade_quantities * latest_prices) ** (3 / 2)
-    )  # * portfolio_value
+    # # market impact cost TODO: correct???
+    # kappa_impact = latest_volas / (market_volume**0.5)
+    # # print(market_volume.max())
+    # market_cost = kappa_impact @ (
+    #     np.abs(trade_quantities * latest_prices) ** (3 / 2)
+    # )  # * portfolio_value
 
-    # print(1, latest_volas)
-    # print(2, latest_volume)
-    # print(3, np.abs(trade_quantities).max())
-    # print(1, sell_receipt - buy_payment)
-    print(2, market_cost)
-    print(portfolio_value)
-    # print(1, latest_volas)
-    # print(2, latest_volume)
-    # print(np.abs(trade_quantities*latest_prices).sum())
+    # print(market_cost)
+    # print(2, market_cost / portfolio_value / (0.01**2))
 
-    # print(latest_volume)
-
-    # print(latest_volas)
-    # print(((trade_quantities*latest_prices)/portfolio_value).max())
-
-    return sell_receipt - buy_payment - market_cost
+    return sell_receipt - buy_payment  # - market_cost
 
 
 def interest_and_fees(
