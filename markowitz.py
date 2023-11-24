@@ -83,7 +83,7 @@ class Limits:
     risk_max: float
 
 
-def markowitz_old(
+def markowitz_hard(
     data: Data, param: Parameters
 ) -> tuple[np.ndarray, float, cp.Problem]:
     """
@@ -126,11 +126,7 @@ def markowitz_old(
     trading_cost = spread_cost + impact_cost
 
     objective = (
-        return_wc
-        - param.gamma_risk * cp.pos(risk_wc - param.risk_target)
-        - param.gamma_hold * holding_cost
-        - param.gamma_trade * trading_cost
-        - param.gamma_turn * cp.pos(T - param.T_max)
+        return_wc - param.gamma_hold * holding_cost - param.gamma_trade * trading_cost
     )
 
     constraints = [
@@ -144,19 +140,31 @@ def markowitz_old(
         z <= param.z_upper,
         L <= param.L_max,
         T <= param.T_max,
+        risk_wc <= param.risk_max,
     ]
+
+    # Naming the constraints
+    constraints[0].name = "FullInvestment"
+    constraints[1].name = "Cash"
+    constraints[2].name = "CLower"
+    constraints[3].name = "CUpper"
+    constraints[4].name = "WLower"
+    constraints[5].name = "WUpper"
+    constraints[6].name = "ZLower"
+    constraints[7].name = "ZUpper"
+    constraints[8].name = "Leverage"
+    constraints[9].name = "Turnover"
+    constraints[10].name = "Risk"
 
     problem = cp.Problem(cp.Maximize(objective), constraints)
     problem.solve()
-
     assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
     return w.value, c.value, problem
 
 
-def markowitz(
+def markowitz_soft(
     data: Data,
     param: Parameters,
-    # hard: bool
 ) -> tuple[np.ndarray, float, cp.Problem]:
     """
     Markowitz portfolio optimization.
@@ -206,23 +214,7 @@ def markowitz(
         w <= param.w_upper,
         param.z_lower <= z,
         z <= param.z_upper,
-        # L <= param.L_max,
-        # T <= param.T_max,
-        # risk_wc <= param.risk_max,
     ]
-
-    # Naming the constraints
-    # constraints[0].name = "FullInvestment"
-    # constraints[1].name = "Cash"
-    # constraints[2].name = "CLower"
-    # constraints[3].name = "CUpper"
-    # constraints[4].name = "WLower"
-    # constraints[5].name = "WUpper"
-    # constraints[6].name = "ZLower"
-    # constraints[7].name = "ZUpper"
-    # constraints[8].name = "Leverage"
-    # constraints[9].name = "Turnover"
-    # constraints[10].name = "Risk"
 
     objective = (
         return_wc
@@ -234,6 +226,7 @@ def markowitz(
     )
 
     problem = cp.Problem(cp.Maximize(objective), constraints)
+
     try:
         problem.solve(solver="MOSEK", verbose=False)
     except cp.SolverError:
@@ -288,5 +281,5 @@ if __name__ == "__main__":
         risk_target=0.0,
     )
 
-    w, c = markowitz(data, param)
+    w, c = markowitz_hard(data, param)
     print(w, c)
