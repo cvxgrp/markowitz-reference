@@ -4,3 +4,4 @@ pandas
 matplotlib
 clarabel
 mosek
+multiprocessing

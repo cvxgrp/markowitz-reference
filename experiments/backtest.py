@@ -45,7 +45,7 @@ class OptimizationInput:
     volume: pd.DataFrame
     quantities: np.ndarray
     cash: float
-    risk_target: float
+    # risk_target: float
     risk_free: float
 
     @property
@@ -150,7 +150,7 @@ def run_backtest(
 def run_markowitz(
     strategy: callable,
     targets: namedtuple,
-    limits: namedtuple,
+    # limits: namedtuple,
     hyperparameters: namedtuple,
     prices=None,
     spread=None,
@@ -185,19 +185,19 @@ def run_markowitz(
     lookback = 500
     forward_smoothing = 5
 
-    constraint_names = [
-        "FullInvestment",
-        "Cash",
-        "CLower",
-        "CUpper",
-        "WLower",
-        "WUpper",
-        "ZLower",
-        "ZUpper",
-        "Leverage",
-        "Turnover",
-        "Risk",
-    ]
+    # constraint_names = [
+    #     "FullInvestment",
+    #     "Cash",
+    #     "CLower",
+    #     "CUpper",
+    #     "WLower",
+    #     "WUpper",
+    #     "ZLower",
+    #     "ZUpper",
+    #     "Leverage",
+    #     "Turnover",
+    #     "Risk",
+    # ]
 
     timings = []
 
@@ -221,13 +221,13 @@ def run_markowitz(
     # To store results
     post_trade_cash = []
     post_trade_quantities = []
-    dual_optimals = (
-        pd.DataFrame(
-            columns=constraint_names,
-            index=prices.index[lookback:-1],
-        )
-        * np.nan
-    )
+    # dual_optimals = (
+    #     pd.DataFrame(
+    #         columns=constraint_names,
+    #         index=prices.index[lookback:-1],
+    #     )
+    #     * np.nan
+    # )
 
     for t in range(lookback, len(prices) - forward_smoothing):
         start_time = time.perf_counter()
@@ -251,12 +251,14 @@ def run_markowitz(
             volume_t,
             quantities,
             cash,
-            limits.risk_max,
+            # limits.risk_max,
             rf.iloc[t],
         )
 
         w, _, problem, problem_solved = strategy(
-            inputs_t, hyperparameters, targets=targets, limits=limits
+            inputs_t,
+            hyperparameters,
+            targets=targets,
         )
 
         latest_prices = prices.iloc[t]  # At t
@@ -287,11 +289,11 @@ def run_markowitz(
         post_trade_cash.append(cash)
         post_trade_quantities.append(quantities.copy())
 
-        if problem_solved:
-            for name in constraint_names:
-                dual_optimals.loc[day, name] = problem.constraints[
-                    constraint_names.index(name)
-                ].dual_value
+        # if problem_solved:
+        #     for name in constraint_names:
+        #         dual_optimals.loc[day, name] = problem.constraints[
+        #             constraint_names.index(name)
+        #         ].dual_value
 
         # Timings
         end_time = time.perf_counter()
@@ -309,11 +311,8 @@ def run_markowitz(
         columns=prices.columns,
     )
 
-    return (
-        BacktestResult(
-            post_trade_cash, post_trade_quantities, limits.risk_max, timings
-        ),
-        dual_optimals,
+    return BacktestResult(
+        post_trade_cash, post_trade_quantities, targets.risk_target, timings
     )
 
 

@@ -45,12 +45,12 @@ class Parameters:
     c_upper: float  # upper bound on cash weight
     z_lower: np.ndarray  # (n_assets,) array of lower bounds on trades
     z_upper: np.ndarray  # (n_assets,) array of upper bounds on trades
-    T_target: float  # turnover target
+    # T_target: float  # turnover target
     T_max: float  # turnover limit
-    L_target: float  # leverage target
+    # L_target: float  # leverage target
     L_max: float  # leverage limit
     risk_target: float  # risk target as volatility
-    risk_max: float  # risk limit as volatility
+    # risk_max: float  # risk limit as volatility
     rho_mean: np.ndarray  # (n_assets,) array of mean returns for rho
     rho_covariance: float  # uncertainty in covariance matrix
     gamma_hold: float  # holding cost
@@ -206,31 +206,31 @@ def markowitz(
         w <= param.w_upper,
         param.z_lower <= z,
         z <= param.z_upper,
-        L <= param.L_max,
-        T <= param.T_max,
-        risk_wc <= param.risk_max,
+        # L <= param.L_max,
+        # T <= param.T_max,
+        # risk_wc <= param.risk_max,
     ]
 
     # Naming the constraints
-    constraints[0].name = "FullInvestment"
-    constraints[1].name = "Cash"
-    constraints[2].name = "CLower"
-    constraints[3].name = "CUpper"
-    constraints[4].name = "WLower"
-    constraints[5].name = "WUpper"
-    constraints[6].name = "ZLower"
-    constraints[7].name = "ZUpper"
-    constraints[8].name = "Leverage"
-    constraints[9].name = "Turnover"
-    constraints[10].name = "Risk"
+    # constraints[0].name = "FullInvestment"
+    # constraints[1].name = "Cash"
+    # constraints[2].name = "CLower"
+    # constraints[3].name = "CUpper"
+    # constraints[4].name = "WLower"
+    # constraints[5].name = "WUpper"
+    # constraints[6].name = "ZLower"
+    # constraints[7].name = "ZUpper"
+    # constraints[8].name = "Leverage"
+    # constraints[9].name = "Turnover"
+    # constraints[10].name = "Risk"
 
     objective = (
         return_wc
         - param.gamma_risk * cp.pos(risk_wc - param.risk_target)
         - param.gamma_hold * holding_cost
         - param.gamma_trade * trading_cost
-        - param.gamma_turn * cp.pos(T - param.T_target)
-        - param.gamma_leverage * cp.pos(L - param.L_target)
+        - param.gamma_turn * cp.pos(T - param.T_max)
+        - param.gamma_leverage * cp.pos(L - param.L_max)
     )
 
     problem = cp.Problem(cp.Maximize(objective), constraints)
