@@ -2,22 +2,20 @@ import numpy as np
 import pandas as pd
 import cvxpy as cp
 from backtest import BacktestResult, OptimizationInput, run_backtest
+from utils import get_solver
 from markowitz import Data, Parameters, markowitz
 
 
-def basic_markowitz(inputs: OptimizationInput) -> np.ndarray:
+def basic_markowitz(inputs: OptimizationInput) -> tuple[np.ndarray, float, cp.Problem]:
     """Compute the basic Markowitz portfolio weights."""
-
-    mu, Sigma = inputs.mean.values, inputs.covariance.values
 
     w = cp.Variable(inputs.n_assets)
     c = cp.Variable()
-    objective = mu @ w
+    objective = inputs.mean.values @ w
 
-    chol = np.linalg.cholesky(Sigma)
     constraints = [
         cp.sum(w) + c == 1,
-        cp.norm2(chol.T @ w) <= inputs.risk_target,
+        cp.norm2(inputs.chol.T @ w) <= inputs.risk_target,
     ]
 
     problem = cp.Problem(cp.Maximize(objective), constraints)
@@ -26,7 +24,7 @@ def basic_markowitz(inputs: OptimizationInput) -> np.ndarray:
     return w.value, c.value, problem
 
 
-def equal_weights(inputs: OptimizationInput) -> np.ndarray:
+def equal_weights(inputs: OptimizationInput) -> tuple[np.ndarray, float, cp.Problem]:
     """Compute the equal weights portfolio."""
     n_assets = inputs.prices.shape[1]
     w = np.ones(n_assets) / (n_assets + 1)
@@ -34,7 +32,9 @@ def equal_weights(inputs: OptimizationInput) -> np.ndarray:
     return w, c, None
 
 
-def weight_limits_markowitz(inputs: OptimizationInput) -> np.ndarray:
+def weight_limits_markowitz(
+    inputs: OptimizationInput,
+) -> tuple[np.ndarray, float, cp.Problem]:
     lb = np.ones(inputs.n_assets) * (-0.05)
     ub = np.ones(inputs.n_assets) * 0.1
 
@@ -49,21 +49,25 @@ def weight_limits_markowitz(inputs: OptimizationInput) -> np.ndarray:
     return markowitz(data, param)
 
 
-def leverage_limit_markowitz(inputs: OptimizationInput) -> np.ndarray:
+def leverage_limit_markowitz(
+    inputs: OptimizationInput,
+) -> tuple[np.ndarray, float, cp.Problem]:
     data, param = get_basic_data_and_parameters(inputs)
 
     param.L_max = 1.6
     return markowitz(data, param)
 
 
-def turnover_limit_markowitz(inputs: OptimizationInput) -> np.ndarray:
+def turnover_limit_markowitz(
+    inputs: OptimizationInput,
+) -> tuple[np.ndarray, float, cp.Problem]:
     data, param = get_basic_data_and_parameters(inputs)
 
     param.T_max = 50 / 252  # Maximum TO per year
     return markowitz(data, param)
 
 
-def robust_markowitz(inputs: OptimizationInput) -> np.ndarray:
+def robust_markowitz(inputs: OptimizationInput) -> tuple[np.ndarray, float, cp.Problem]:
     data, param = get_basic_data_and_parameters(inputs)
     param.rho_mean = np.percentile(np.abs(inputs.mean.values), 20, axis=0) * np.ones(
         inputs.n_assets
@@ -90,7 +94,7 @@ def get_basic_data_and_parameters(
         idio_mean=np.zeros(n_assets),
         factor_mean=inputs.mean.values,
         risk_free=0,
-        factor_covariance_chol=np.linalg.cholesky(inputs.covariance.values),
+        factor_covariance_chol=inputs.chol,
         idio_volas=np.zeros(n_assets),
         F=np.eye(n_assets),
         kappa_short=np.zeros(n_assets),
@@ -118,7 +122,7 @@ def get_basic_data_and_parameters(
     return data, param
 
 
-def main(from_checkpoint: bool = False):
+def main(from_checkpoint: bool = True) -> None:
     annualized_target = 0.10
 
     if not from_checkpoint:
@@ -242,10 +246,6 @@ def generate_table(
             formatters=formatters,
         )
     )
-
-
-def get_solver():
-    return cp.MOSEK if cp.MOSEK in cp.installed_solvers() else cp.CLARABEL
 
 
 if __name__ == "__main__":
