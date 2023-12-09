@@ -10,7 +10,7 @@ from typing import Callable
 import numpy as np
 import cvxpy as cp
 import pandas as pd
-from utils import synthetic_returns
+from experiments.utils import synthetic_returns
 
 # hack to allow importing from parent directory without having a package
 sys.path.append(str(Path(__file__).parent.parent))

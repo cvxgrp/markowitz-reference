@@ -2,3 +2,6 @@ cvxpy
 numpy
 pandas
 matplotlib
+jinja2        # needed to generate the tables for Latex?
+loguru        # professional logging
+cvxsimulator  # for backtesting
