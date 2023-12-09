@@ -1,4 +1,4 @@
 cvxpy==1.4.1
 numpy==1.26.2
-pandas
+pandas[output-formatting]
 matplotlib==3.8.2

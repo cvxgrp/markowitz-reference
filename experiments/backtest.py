@@ -4,16 +4,12 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 import pickle
-import sys
 import time
 from typing import Callable
 import numpy as np
 import cvxpy as cp
 import pandas as pd
-from utils import synthetic_returns
-
-# hack to allow importing from parent directory without having a package
-sys.path.append(str(Path(__file__).parent.parent))
+from experiments.utils import synthetic_returns
 
 
 def data_folder():
