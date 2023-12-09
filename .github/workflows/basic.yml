@@ -21,4 +21,4 @@ jobs:
       - name: testing
         shell: bash
         run: |
-          make test
+          make experiments
