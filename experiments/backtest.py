@@ -11,10 +11,6 @@ import cvxpy as cp
 import pandas as pd
 from experiments.utils import synthetic_returns
 
-# VERBOTEN
-# hack to allow importing from parent directory without having a package
-# sys.path.append(str(Path(__file__).parent.parent))
-
 
 def data_folder():
     return Path(__file__).parent.parent / "data"
