@@ -1,4 +1,4 @@
 cvxpy
 numpy
-pandas
+pandas[output-formatting]
 matplotlib
