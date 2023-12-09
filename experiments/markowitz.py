@@ -58,12 +58,14 @@ class Parameters:
 
 
 def markowitz(
-    data: Data, param: Parameters, **kwargs
+    data: Data, param: Parameters, solver=None
 ) -> tuple[np.ndarray, float, cp.Problem]:
     """
     Markowitz portfolio optimization.
     This function contains the code listing for the accompanying paper.
     """
+
+    solver = solver or _get_solver()
 
     w, c = cp.Variable(data.n_assets), cp.Variable()
 
@@ -121,9 +123,13 @@ def markowitz(
     ]
 
     problem = cp.Problem(cp.Maximize(objective), constraints)
-    problem.solve(**kwargs)
+    problem.solve(solver=solver)
     assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
     return w.value, c.value, problem
+
+
+def _get_solver():
+    return cp.MOSEK if cp.MOSEK in cp.installed_solvers() else cp.CLARABEL
 
 
 # if __name__ == "__main__":

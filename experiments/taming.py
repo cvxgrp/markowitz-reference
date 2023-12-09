@@ -1,11 +1,14 @@
 import numpy as np
 import pandas as pd
 import cvxpy as cp
+from cvxpy import Problem
+from numpy import ndarray
+
 from experiments.backtest import BacktestResult, OptimizationInput, run_backtest
 from experiments.markowitz import Data, Parameters, markowitz
 
 
-def _basic_markowitz(inputs: OptimizationInput) -> np.ndarray:
+def _basic_markowitz(inputs: OptimizationInput, solver=None) -> np.ndarray:
     """Compute the basic Markowitz portfolio weights."""
 
     mu, Sigma = inputs.mean.values, inputs.covariance.values
@@ -21,7 +24,7 @@ def _basic_markowitz(inputs: OptimizationInput) -> np.ndarray:
     ]
 
     problem = cp.Problem(cp.Maximize(objective), constraints)
-    problem.solve(solver=_get_solver())
+    problem.solve(solver=solver)
     assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
     return w.value, c.value, problem
 
@@ -34,7 +37,7 @@ def _equal_weights(inputs: OptimizationInput) -> np.ndarray:
     return w, c, None
 
 
-def _weight_limits_markowitz(inputs: OptimizationInput) -> np.ndarray:
+def _weight_limits_markowitz(inputs: OptimizationInput, solver=None) -> np.ndarray:
     lb = np.ones(inputs.n_assets) * (-0.05)
     ub = np.ones(inputs.n_assets) * 0.1
 
@@ -46,30 +49,36 @@ def _weight_limits_markowitz(inputs: OptimizationInput) -> np.ndarray:
     param.c_upper = 1.0
     param.risk_target = inputs.risk_target
     param.gamma_risk = 5.0
-    return markowitz(data, param, solver=_get_solver())
+    return markowitz(data, param, solver=solver)
 
 
-def _leverage_limit_markowitz(inputs: OptimizationInput) -> np.ndarray:
+def _leverage_limit_markowitz(
+    inputs: OptimizationInput, solver=None
+) -> tuple[ndarray, float, Problem]:
     data, param = _get_basic_data_and_parameters(inputs)
 
     param.L_max = 1.6
-    return markowitz(data, param, solver=_get_solver())
+    return markowitz(data, param, solver=solver)
 
 
-def _turnover_limit_markowitz(inputs: OptimizationInput) -> np.ndarray:
+def _turnover_limit_markowitz(
+    inputs: OptimizationInput, solver=None
+) -> tuple[ndarray, float, Problem]:
     data, param = _get_basic_data_and_parameters(inputs)
 
     param.T_max = 50 / 252  # Maximum TO per year
-    return markowitz(data, param, solver=_get_solver())
+    return markowitz(data, param, solver=solver)
 
 
-def _robust_markowitz(inputs: OptimizationInput) -> np.ndarray:
+def _robust_markowitz(
+    inputs: OptimizationInput, solver=None
+) -> tuple[ndarray, float, Problem]:
     data, param = _get_basic_data_and_parameters(inputs)
     param.rho_mean = np.percentile(np.abs(inputs.mean.values), 20, axis=0) * np.ones(
         inputs.n_assets
     )
     param.rho_covariance = 0.02
-    return markowitz(data, param, solver=_get_solver())
+    return markowitz(data, param, solver=solver)
 
 
 def _get_basic_data_and_parameters(
@@ -244,8 +253,8 @@ def _generate_table(
     )
 
 
-def _get_solver():
-    return cp.MOSEK if cp.MOSEK in cp.installed_solvers() else cp.CLARABEL
+# def _get_solver():
+#     return cp.MOSEK if cp.MOSEK in cp.installed_solvers() else cp.CLARABEL
 
 
 if __name__ == "__main__":
