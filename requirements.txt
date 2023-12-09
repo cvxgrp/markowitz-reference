@@ -1,4 +1,4 @@
-cvxpy
-numpy
+cvxpy==1.4.1
+numpy==1.26.2
 pandas
-matplotlib
+matplotlib==3.8.2
