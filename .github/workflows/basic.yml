@@ -13,12 +13,12 @@ jobs:
       with:
         extra_args: '--verbose --all-files'
 
-  test:
+  experiment:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v3
-      - name: testing
+      - name: experiments
         shell: bash
         run: |
           make experiment
