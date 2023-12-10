@@ -23,8 +23,8 @@ experiment: install ## Run all experiment
 	${VENV}/bin/python experiments.py
 
 .PHONY: experiment_cicd
-experiment_short: install ## Run all experiment
-	${VENV}/bin/python experiments_short.py
+experiment_cicd: install ## Run all experiment
+	${VENV}/bin/python experiments_cicd.py
 
 .PHONY: help
 help:  ## Display this help screen
