@@ -1,9 +1,10 @@
 import numpy as np
 import pandas as pd
 import cvxpy as cp
-from backtest import BacktestResult, OptimizationInput, run_backtest
-from utils import get_solver
-from markowitz import Data, Parameters, markowitz
+
+from experiments.backtest import BacktestResult, OptimizationInput, run_backtest
+from experiments.markowitz import Data, Parameters, markowitz
+from experiments.utils import get_solver
 
 
 def basic_markowitz(inputs: OptimizationInput) -> tuple[np.ndarray, float, cp.Problem]:
