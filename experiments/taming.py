@@ -118,11 +118,11 @@ def get_basic_data_and_parameters(
     return data, param
 
 
-def main(from_checkpoint: bool = False):
+def main(from_checkpoint: bool = False, n: int = None):
     annualized_target = 0.10
 
     if not from_checkpoint:
-        run_all_strategies(annualized_target)
+        run_all_strategies(annualized_target, n=n)
 
     equal_weights_results = BacktestResult.load("checkpoints/equal_weights.pickle")
 
@@ -131,12 +131,15 @@ def main(from_checkpoint: bool = False):
     weight_limited_result = BacktestResult.load(
         f"checkpoints/weight_limited_{annualized_target}.pickle"
     )
+
     leverage_limit_result = BacktestResult.load(
         f"checkpoints/leverage_limit_{annualized_target}.pickle"
     )
+
     turnover_limit_result = BacktestResult.load(
         f"checkpoints/turnover_limit_{annualized_target}.pickle"
     )
+
     robust_result = BacktestResult.load(
         f"checkpoints/robust_{annualized_target}.pickle"
     )
@@ -151,37 +154,37 @@ def main(from_checkpoint: bool = False):
     )
 
 
-def run_all_strategies(annualized_target: float) -> None:
-    equal_weights_results = run_backtest(equal_weights, 0.0, verbose=True)
+def run_all_strategies(annualized_target: float, n: int = None) -> None:
+    equal_weights_results = run_backtest(equal_weights, 0.0, verbose=True, n=n)
     equal_weights_results.save("checkpoints/equal_weights.pickle")
 
     adjustment_factor = np.sqrt(equal_weights_results.periods_per_year)
     sigma_target = annualized_target / adjustment_factor
 
     print("Running basic Markowitz")
-    basic_result = run_backtest(basic_markowitz, sigma_target, verbose=True)
+    basic_result = run_backtest(basic_markowitz, sigma_target, verbose=True, n=n)
     basic_result.save(f"checkpoints/basic_{annualized_target}.pickle")
 
     print("Running weight-limited Markowitz")
     weight_limited_result = run_backtest(
-        weight_limits_markowitz, sigma_target, verbose=True
+        weight_limits_markowitz, sigma_target, verbose=True, n=n
     )
     weight_limited_result.save(f"checkpoints/weight_limited_{annualized_target}.pickle")
 
     print("Running leverage limit Markowitz")
     leverage_limit_result = run_backtest(
-        leverage_limit_markowitz, sigma_target, verbose=True
+        leverage_limit_markowitz, sigma_target, verbose=True, n=n
     )
     leverage_limit_result.save(f"checkpoints/leverage_limit_{annualized_target}.pickle")
 
     print("Running turnover limit Markowitz")
     turnover_limit_result = run_backtest(
-        turnover_limit_markowitz, sigma_target, verbose=True
+        turnover_limit_markowitz, sigma_target, verbose=True, n=n
     )
     turnover_limit_result.save(f"checkpoints/turnover_limit_{annualized_target}.pickle")
 
     print("Running robust Markowitz")
-    robust_result = run_backtest(robust_markowitz, sigma_target, verbose=True)
+    robust_result = run_backtest(robust_markowitz, sigma_target, verbose=True, n=n)
     robust_result.save(f"checkpoints/robust_{annualized_target}.pickle")
 
 

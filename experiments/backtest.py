@@ -17,11 +17,21 @@ def data_folder():
 
 
 @lru_cache(maxsize=1)
-def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def load_data(n=None) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     prices = pd.read_csv(data_folder() / "prices.csv", index_col=0, parse_dates=True)
     spread = pd.read_csv(data_folder() / "spreads.csv", index_col=0, parse_dates=True)
     volume = pd.read_csv(data_folder() / "volumes.csv", index_col=0, parse_dates=True)
-    rf = pd.read_csv(data_folder() / "rf.csv", index_col=0, parse_dates=True).iloc[:, 0]
+    rf = pd.read_csv(data_folder() / "rf.csv", index_col=0, parse_dates=True).squeeze()
+
+    # get the last n days of data
+    n = n or prices.shape[0]
+    prices = prices.tail(n)
+
+    # align the data
+    spread = spread.loc[prices.index]
+    volume = volume.loc[prices.index]
+    rf = rf.loc[prices.index]
+
     return prices, spread, volume, rf
 
 
@@ -47,7 +57,7 @@ class OptimizationInput:
 
 
 def run_backtest(
-    strategy: Callable, risk_target: float, verbose: bool = False
+    strategy: Callable, risk_target: float, verbose: bool = False, n: int = None
 ) -> tuple[pd.Series, pd.DataFrame]:
     """
     Run a simplified backtest for a given strategy.
@@ -55,7 +65,7 @@ def run_backtest(
     weights and then execute the trades at time t.
     """
 
-    prices, spread, volume, rf = load_data()
+    prices, spread, volume, rf = load_data(n=n)
     n_assets = prices.shape[1]
 
     lookback = 500

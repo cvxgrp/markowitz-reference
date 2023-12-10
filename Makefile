@@ -22,6 +22,10 @@ clean:  ## Clean up caches and build artifacts
 experiment: install ## Run all experiment
 	${VENV}/bin/python experiments.py
 
+.PHONY: experiment_cicd
+experiment_short: install ## Run all experiment
+	${VENV}/bin/python experiments_short.py
+
 .PHONY: help
 help:  ## Display this help screen
 	@echo -e "\033[1mAvailable commands:\033[0m"

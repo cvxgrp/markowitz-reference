@@ -21,4 +21,4 @@ jobs:
       - name: experiments
         shell: bash
         run: |
-          make experiment
+          make experiment_cicd
