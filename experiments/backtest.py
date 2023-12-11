@@ -47,7 +47,7 @@ class OptimizationInput:
 
 def run_backtest(
     strategy: Callable, risk_target: float, verbose: bool = False
-) -> tuple[pd.Series, pd.DataFrame]:
+) -> BacktestResult:
     """
     Run a simplified backtest for a given strategy.
     At time t we use data from t-lookback to t to compute the optimal portfolio
@@ -55,6 +55,13 @@ def run_backtest(
     """
 
     prices, spread, rf = load_data()
+    training_length = 1250
+    prices, spread, rf = (
+        prices.iloc[training_length:],
+        spread.iloc[training_length:],
+        rf.iloc[training_length:],
+    )
+
     n_assets = prices.shape[1]
 
     lookback = 500
