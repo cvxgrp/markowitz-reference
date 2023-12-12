@@ -5,12 +5,12 @@ from utils import generate_random_inputs
 
 
 def main():
-    fitting = True
+    fitting = False
     scenarios = get_scenarios(fitting=fitting)
     res = []
     for n_assets, n_factors in scenarios:
         print(f"Running scenario with {n_assets} assets and {n_factors} factors")
-        solvers = [cp.CLARABEL] if fitting else [cp.MOSEK, cp.CLARABEL]
+        solvers = [cp.MOSEK] if fitting else [cp.CLARABEL, cp.MOSEK]
         for solver in solvers:
             for _ in range(1):
                 problem = run_scaling(n_assets, n_factors, solver)
@@ -60,7 +60,7 @@ def main():
         df.set_index(["n_assets", "n_factors"], inplace=True)
         df = df.pivot(columns="solver", values="solve_time")
         df = df.map(lambda x: f"{x:.2f}")
-        df = df.loc[:, [cp.MOSEK, cp.CLARABEL]]
+        df = df.loc[:, solvers]
 
         # Reset column and row indices
         df.reset_index(inplace=True)
@@ -151,8 +151,9 @@ def get_scenarios(fitting=False):
         ]
     else:
         # fine grid for fitting
-        assets = np.logspace(2, 3, 10, dtype=int)
-        pairs = [(a, int(a * f)) for a in assets for f in np.logspace(-2, -1, 10)]
+        assets = np.logspace(3, 3.5, 10, dtype=int)
+        factors = np.logspace(3, 3.5, 10, dtype=int)
+        pairs = [(a, f) for a in assets for f in factors if a >= f]
         return pairs
 
 
