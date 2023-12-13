@@ -3,7 +3,13 @@ import time
 from matplotlib import pyplot as plt
 import cvxpy as cp
 import numpy as np
-from backtest import BacktestResult, OptimizationInput, Timing, load_data, run_backtest
+from experiments.backtest import (
+    BacktestResult,
+    OptimizationInput,
+    Timing,
+    load_data,
+    run_backtest,
+)
 from experiments.utils import get_solver
 
 
@@ -205,11 +211,11 @@ def plot_timings(timings: list[Timing], specifier: str = "") -> None:
 
     plt.ylabel("Time (s)")
     plt.legend()
-    plt.savefig(f"figures/timing{specifier}.png")
+    plt.savefig(f"figures/timing{specifier}.pdf")
     plt.show()
 
 
-def main(from_checkpoint: bool = True) -> None:
+def main(from_checkpoint: bool = False) -> None:
     annualized_target = 0.10
     sigma_target = annualized_target / np.sqrt(252)
 
