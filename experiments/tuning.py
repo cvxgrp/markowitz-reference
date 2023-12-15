@@ -1,10 +1,22 @@
 import numpy as np
 import pandas as pd
-from markowitz import Data, Parameters, markowitz
+from markowitz import Data, Parameters, markowitz_soft
 from dataclasses import dataclass
+from collections import namedtuple
 import multiprocessing as mp
+import time
+import cvxpy as cp
 
-from backtest import run_markowitz, load_data
+from backtest import (
+    load_data,
+    OptimizationInput,
+    interest_and_fees,
+    create_orders,
+    execute_orders,
+    Timing,
+    BacktestResult,
+)
+from utils import synthetic_returns
 
 
 @dataclass
@@ -46,14 +58,6 @@ def get_data_and_parameters(
     portfolio_value = inputs.cash + inputs.quantities @ latest_prices
 
     spread_prediction = inputs.spread.iloc[-6:-1].mean().values
-
-    # print(111, (pd.Series(volume_prediction) == 0).sum())
-    # print(1, volatilities)
-    # print(2, volume_prediction)
-    # print(3, kappa_impact)
-    # print(43243, portfolio_value)
-
-    # print(kappa_impact)
 
     w_lower = -0.05
     w_upper = 0.1
@@ -130,6 +134,102 @@ def get_data_and_parameters(
     return data, param
 
 
+def markowitz_hard(
+    data: Data, param: Parameters
+) -> tuple[np.ndarray, float, cp.Problem]:
+    """
+    Markowitz portfolio optimization.
+    This function contains the code listing for the accompanying paper.
+    """
+
+    w, c = cp.Variable(data.n_assets), cp.Variable()
+
+    z = w - data.w_prev
+    T = cp.norm1(z)
+    L = cp.norm1(w)
+
+    # worst-case (robust) return
+    factor_return = (data.F @ data.factor_mean).T @ w
+    idio_return = data.idio_mean @ w
+    mean_return = factor_return + idio_return + data.risk_free * c
+    return_uncertainty = param.rho_mean @ cp.abs(w)
+    return_wc = mean_return - return_uncertainty
+
+    # asset volatilities
+    factor_volas = cp.norm2(data.F @ data.factor_covariance_chol, axis=1)
+    volas = factor_volas + data.idio_volas
+
+    # portfolio risk
+    factor_risk = cp.norm2((data.F @ data.factor_covariance_chol).T @ w)
+    idio_risk = cp.norm2(cp.multiply(data.idio_volas, w))
+    risk = cp.norm2(cp.hstack([factor_risk, idio_risk]))
+
+    # worst-case (robust) risk
+    risk_uncertainty = param.rho_covariance**0.5 * volas @ cp.abs(w)
+    risk_wc = cp.norm2(cp.hstack([risk, risk_uncertainty]))
+
+    asset_holding_cost = data.kappa_short @ cp.pos(-w)
+    cash_holding_cost = data.kappa_borrow * cp.pos(-c)
+    holding_cost = asset_holding_cost + cash_holding_cost
+
+    spread_cost = data.kappa_spread @ cp.abs(z)
+    impact_cost = data.kappa_impact @ cp.power(cp.abs(z), 3 / 2)
+    trading_cost = spread_cost + impact_cost
+
+    objective = (
+        return_wc - param.gamma_hold * holding_cost - param.gamma_trade * trading_cost
+    )
+
+    constraints = [
+        cp.sum(w) + c == 1,
+        c == data.c_prev - cp.sum(z),
+        param.c_lower <= c,
+        c <= param.c_upper,
+        param.w_lower <= w,
+        w <= param.w_upper,
+        param.z_lower <= z,
+        z <= param.z_upper,
+        L <= param.L_max,
+        T <= param.T_max,
+        risk_wc <= param.risk_target,
+    ]
+
+    # Naming the constraints
+    constraints[0].name = "FullInvestment"
+    constraints[1].name = "Cash"
+    constraints[2].name = "CLower"
+    constraints[3].name = "CUpper"
+    constraints[4].name = "WLower"
+    constraints[5].name = "WUpper"
+    constraints[6].name = "ZLower"
+    constraints[7].name = "ZUpper"
+    constraints[8].name = "Leverage"
+    constraints[9].name = "Turnover"
+    constraints[10].name = "Risk"
+
+    problem = cp.Problem(cp.Maximize(objective), constraints)
+    problem.solve()
+    assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
+    return w.value, c.value, problem, True  # True means problem solved
+
+
+def solve_hard_markowitz(inputs, hyperparamters, targets):
+    """
+    param inputs: OptimizationInputs object
+    param hyperparameters: HyperParameters object (gamma_hold, gamma_trade,
+    gamma_turn, gamma_leverage, gamma_risk)
+    param targets: Targets object (T_target, L_target, risk_target)
+    param limits: Limits object (T_max, L_max, risk_max)
+
+    returns: w, c, problem, problem_solved
+    """
+    data, param = get_data_and_parameters(inputs, hyperparamters, targets)
+
+    w, c, problem, problem_solved = markowitz_hard(data, param)
+
+    return w, c, problem, problem_solved
+
+
 def full_markowitz(inputs, hyperparamters, targets):
     """
     param inputs: OptimizationInputs object
@@ -143,7 +243,7 @@ def full_markowitz(inputs, hyperparamters, targets):
 
     data, param = get_data_and_parameters(inputs, hyperparamters, targets)
 
-    w, c, problem, problem_solved = markowitz(data, param)
+    w, c, problem, problem_solved = markowitz_soft(data, param)
     return w, c, problem, problem_solved
 
 
@@ -188,11 +288,12 @@ def tune_parameters(
     param train_len: length of training period; if None, all data is used for tuning
     """
     train_len = train_len or len(prices)
+    test_len = len(prices) - 500 - train_len
 
     #### Helper functions ####
 
     def run_strategy(targets, hyperparameters):
-        results = run_markowitz(
+        results = run_soft_backtest(
             strategy,
             targets=targets,
             hyperparameters=hyperparameters,
@@ -207,10 +308,17 @@ def tune_parameters(
     def sharpes(results):
         """
         returns sharpe ratio for training and test period"""
-        returns_train = results.portfolio_returns.iloc[:train_len]
-        returns_test = results.portfolio_returns.iloc[train_len:]
-        sharpe_train = np.sqrt(252) * returns_train.mean() / returns_train.std()
-        sharpe_test = np.sqrt(252) * returns_test.mean() / returns_test.std()
+        returns_train = results.portfolio_returns.iloc[:-test_len]
+        returns_test = results.portfolio_returns.iloc[-test_len:]
+
+        sharpe_train = (
+            np.sqrt(results.periods_per_year)
+            * returns_train.mean()
+            / returns_train.std()
+        )
+        sharpe_test = (
+            np.sqrt(results.periods_per_year) * returns_test.mean() / returns_test.std()
+        )
 
         return sharpe_train, sharpe_test
 
@@ -220,8 +328,8 @@ def tune_parameters(
         trades = results.quantities.diff()
         valuation_trades = (trades * prices).dropna()
         relative_trades = valuation_trades.div(results.portfolio_value, axis=0)
-        relative_trades_train = relative_trades.iloc[:train_len]
-        relative_trades_test = relative_trades.iloc[train_len:]
+        relative_trades_train = relative_trades.iloc[:-test_len]
+        relative_trades_test = relative_trades.iloc[-test_len:]
 
         turnover_train = (
             relative_trades_train.abs().sum(axis=1).mean() * results.periods_per_year
@@ -235,17 +343,17 @@ def tune_parameters(
     def leverages(results):
         """
         returns leverage for training and test period"""
-        leverage_train = results.asset_weights.abs().sum(axis=1).iloc[:train_len].max()
-        leverage_test = results.asset_weights.abs().sum(axis=1).iloc[train_len:].max()
+        leverage_train = results.asset_weights.abs().sum(axis=1).iloc[:-test_len].max()
+        leverage_test = results.asset_weights.abs().sum(axis=1).iloc[-test_len:].max()
         return leverage_train, leverage_test
 
     def risks(results):
         """
         returns risk for training and test period"""
-        returns_train = results.portfolio_returns.iloc[:train_len]
-        returns_test = results.portfolio_returns.iloc[train_len:]
-        risk_train = returns_train.std() * np.sqrt(252)
-        risk_test = returns_test.std() * np.sqrt(252)
+        returns_train = results.portfolio_returns.iloc[:-test_len]
+        returns_test = results.portfolio_returns.iloc[-test_len:]
+        risk_train = returns_train.std() * np.sqrt(results.periods_per_year)
+        risk_test = returns_test.std() * np.sqrt(results.periods_per_year)
         return risk_train, risk_test
 
     def accept_new_parameter(results, sharpe_old):
@@ -415,9 +523,311 @@ def tune_in_parallel(
     return results
 
 
+def run_hard_backtest(
+    strategy: callable,
+    targets: namedtuple,
+    hyperparameters: namedtuple,
+    prices=None,
+    spread=None,
+    volume=None,
+    rf=None,
+    verbose: bool = False,
+) -> tuple[pd.Series, pd.DataFrame]:
+    """
+    Run a simplified backtest for a given strategy.
+    At time t we use data from t-lookback to t to compute the optimal portfolio
+    weights and then execute the trades at time t.
+    """
+
+    if prices is None:
+        train_len = 1250
+        prices, spread, volume, rf = load_data()
+        prices, spread, volume, rf = (
+            prices.iloc[train_len:],
+            spread.iloc[train_len:],
+            volume.iloc[train_len:],
+            rf.iloc[train_len:],
+        )
+
+    n_assets = prices.shape[1]
+
+    lookback = 500
+    forward_smoothing = 5
+
+    constraint_names = [
+        "FullInvestment",
+        "Cash",
+        "CLower",
+        "CUpper",
+        "WLower",
+        "WUpper",
+        "ZLower",
+        "ZUpper",
+        "Leverage",
+        "Turnover",
+        "Risk",
+    ]
+
+    quantities = np.zeros(n_assets)
+    cash = 1e6
+
+    post_trade_cash = []
+    post_trade_quantities = []
+    timings = []
+    dual_optimals = (
+        pd.DataFrame(
+            columns=constraint_names,
+            index=prices.index[lookback:-1],
+        )
+        * np.nan
+    )
+
+    returns = prices.pct_change().dropna()
+    means = (
+        synthetic_returns(
+            prices, information_ratio=0.15, forward_smoothing=forward_smoothing
+        )
+        .shift(-1)
+        .dropna()
+    )  # At time t includes data up to t+1
+    covariance_df = returns.ewm(halflife=125).cov()  # At time t includes data up to t
+    days = returns.index
+    covariances = {}
+    for day in days:
+        covariances[day] = covariance_df.loc[day]
+
+    for t in range(lookback, len(prices) - forward_smoothing):
+        start_time = time.perf_counter()
+
+        day = prices.index[t]
+
+        if verbose:
+            print(f"Day {t} of {len(prices)-forward_smoothing}, {day}")
+
+        prices_t = prices.iloc[t - lookback : t + 1]  # Up to t
+        spread_t = spread.iloc[t - lookback : t + 1]
+        volume_t = volume.iloc[t - lookback : t + 1]
+
+        mean_t = means.loc[day]  # Forecast for return t to t+1
+        covariance_t = covariances[day]  # Forecast for covariance t to t+1
+
+        inputs_t = OptimizationInput(
+            prices_t,
+            mean_t,
+            covariance_t,
+            spread_t,
+            volume_t,
+            quantities,
+            cash,
+            rf.iloc[t],
+        )
+
+        w, _, problem, problem_solved = strategy(
+            inputs_t,
+            hyperparameters,
+            targets=targets,
+        )
+
+        latest_prices = prices.iloc[t]  # At t
+        latest_spread = spread.iloc[t]
+
+        cash += interest_and_fees(
+            cash, rf.iloc[t - 1], quantities, prices.iloc[t - 1], day
+        )
+        trade_quantities = create_orders(w, quantities, cash, latest_prices)
+        quantities += trade_quantities
+        cash += execute_orders(
+            latest_prices,
+            trade_quantities,
+            latest_spread,
+        )
+
+        post_trade_cash.append(cash)
+        post_trade_quantities.append(quantities.copy())
+
+        if problem_solved:
+            for name in constraint_names:
+                dual_optimals.loc[day, name] = problem.constraints[
+                    constraint_names.index(name)
+                ].dual_value
+
+        # Timings
+        end_time = time.perf_counter()
+        timings.append(Timing.get_timing(start_time, end_time, problem))
+
+    post_trade_cash = pd.Series(
+        post_trade_cash, index=prices.index[lookback:-forward_smoothing]
+    )
+    post_trade_quantities = pd.DataFrame(
+        post_trade_quantities,
+        index=prices.index[lookback:-forward_smoothing],
+        columns=prices.columns,
+    )
+
+    return BacktestResult(
+        post_trade_cash,
+        post_trade_quantities,
+        targets.risk_target,
+        timings,
+        dual_optimals,
+    )
+
+
+def run_soft_backtest(
+    strategy: callable,
+    targets: namedtuple,
+    hyperparameters: namedtuple,
+    prices=None,
+    spread=None,
+    volume=None,
+    rf=None,
+    verbose: bool = False,
+) -> tuple[pd.Series, pd.DataFrame]:
+    """
+    Run a simplified backtest for a given strategy.
+    At time t we use data from t-lookback to t to compute the optimal portfolio
+    weights and then execute the trades at time t.
+
+    param strategy: a function that takes an OptimizationInput and returns
+    w, c, problem, problem_solved
+    param prices: a DataFrame of prices
+    param spread: a DataFrame of bid-ask spreads
+    param volume: a DataFrame of trading volumes
+    param rf: a Series of risk-free rates
+    param targets: a namedtuple of targets (T_target, L_target, risk_target)
+    param limits: a namedtuple of limits (T_max, L_max, risk_max)
+    param hyperparameters: a namedtuple of hyperparameters (gamma_hold,
+    gamma_trade, gamma_turn, gamma_risk, gamma_leverage)
+    param verbose: whether to print progress
+
+    return: tuple of BacktestResult instance and DataFrame of dual optimal values
+    """
+
+    if prices is None:
+        train_len = 1250
+        prices, spread, volume, rf = load_data()
+        prices, spread, volume, rf = (
+            prices.iloc[train_len:],
+            spread.iloc[train_len:],
+            volume.iloc[train_len:],
+            rf.iloc[train_len:],
+        )
+
+    n_assets = prices.shape[1]
+    lookback = 500
+    forward_smoothing = 5
+
+    timings = []
+
+    returns = prices.pct_change().dropna()
+    means = (
+        synthetic_returns(
+            prices, information_ratio=0.15, forward_smoothing=forward_smoothing
+        )
+        .shift(-1)
+        .dropna()
+    )  # At time t includes data up to t+1
+    covariance_df = returns.ewm(halflife=125).cov()  # At time t includes data up to t
+    days = returns.index
+    covariances = {}
+    for day in days:
+        covariances[day] = covariance_df.loc[day]
+
+    quantities = np.zeros(n_assets)
+    cash = 1e6
+
+    # To store results
+    post_trade_cash = []
+    post_trade_quantities = []
+    # dual_optimals = (
+    #     pd.DataFrame(
+    #         columns=constraint_names,
+    #         index=prices.index[lookback:-1],
+    #     )
+    #     * np.nan
+    # )
+
+    for t in range(lookback, len(prices) - forward_smoothing):
+        start_time = time.perf_counter()
+        day = prices.index[t]
+
+        if verbose and t % 100 == 0:
+            print(f"Day {t} of {len(prices)-1}, {day}")
+
+        prices_t = prices.iloc[t - lookback : t + 1]  # Up to t
+        spread_t = spread.iloc[t - lookback : t + 1]
+        volume_t = volume.iloc[t - lookback : t + 1]
+
+        mean_t = means.loc[day]  # Forecast for return t to t+1
+        covariance_t = covariances[day]  # Forecast for covariance t to t+1
+
+        inputs_t = OptimizationInput(
+            prices_t,
+            mean_t,
+            covariance_t,
+            spread_t,
+            volume_t,
+            quantities,
+            cash,
+            # limits.risk_max,
+            rf.iloc[t],
+        )
+
+        w, _, problem, problem_solved = strategy(
+            inputs_t,
+            hyperparameters,
+            targets=targets,
+        )
+
+        latest_prices = prices.iloc[t]  # At t
+        latest_spread = spread.iloc[t]
+
+        cash += interest_and_fees(
+            cash, rf.iloc[t - 1], quantities, prices.iloc[t - 1], day
+        )
+        trade_quantities = create_orders(w, quantities, cash, latest_prices)
+        quantities += trade_quantities
+        cash += execute_orders(
+            latest_prices,
+            trade_quantities,
+            latest_spread,
+        )
+
+        # print(((np.abs(trade_quantities)*latest_prices)/volume.iloc[t]).mean())
+
+        post_trade_cash.append(cash)
+        post_trade_quantities.append(quantities.copy())
+
+        # if problem_solved:
+        #     for name in constraint_names:
+        #         dual_optimals.loc[day, name] = problem.constraints[
+        #             constraint_names.index(name)
+        #         ].dual_value
+
+        # Timings
+        end_time = time.perf_counter()
+        if problem_solved:
+            timings.append(Timing.get_timing(start_time, end_time, problem))
+        else:
+            timings.append(None)
+
+    post_trade_cash = pd.Series(
+        post_trade_cash, index=prices.index[lookback:-forward_smoothing]
+    )
+    post_trade_quantities = pd.DataFrame(
+        post_trade_quantities,
+        index=prices.index[lookback:-forward_smoothing],
+        columns=prices.columns,
+    )
+
+    return BacktestResult(
+        post_trade_cash, post_trade_quantities, targets.risk_target, timings
+    )
+
+
 def main():
     gamma_risk = 0.05
-    gamma_turn = 0.002
+    gamma_turn = 0.0025
     gamma_leverage = 0.0005
 
     prices, _, _, _ = load_data()
@@ -441,7 +851,7 @@ def main():
         risk_max=1e3,
     )
 
-    results, _ = run_markowitz(
+    results, _ = run_soft_backtest(
         full_markowitz,
         targets=targets,
         limits=limits,

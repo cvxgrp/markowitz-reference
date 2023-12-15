@@ -1,17 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 import pickle
 import sys
-import time
-from typing import Callable
 import numpy as np
 import cvxpy as cp
 import pandas as pd
-from utils import synthetic_returns
-from collections import namedtuple
 
 # hack to allow importing from parent directory without having a package
 sys.path.append(str(Path(__file__).parent.parent))
@@ -25,8 +21,9 @@ def data_folder():
 def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     prices = pd.read_csv(data_folder() / "prices.csv", index_col=0, parse_dates=True)
     spread = pd.read_csv(data_folder() / "spreads.csv", index_col=0, parse_dates=True)
-    volume = pd.read_csv(
-        data_folder() / "volumes_shares.csv", index_col=0, parse_dates=True
+    volume = (
+        pd.read_csv(data_folder() / "volumes_shares.csv", index_col=0, parse_dates=True)
+        * prices
     )
     rf = pd.read_csv(data_folder() / "rf.csv", index_col=0, parse_dates=True).iloc[:, 0]
     return prices, spread, volume, rf
@@ -53,267 +50,9 @@ class OptimizationInput:
         return self.prices.shape[1]
 
 
-def run_backtest(
-    strategy: Callable, risk_target: float, verbose: bool = False
-) -> tuple[pd.Series, pd.DataFrame]:
-    """
-    Run a simplified backtest for a given strategy.
-    At time t we use data from t-lookback to t to compute the optimal portfolio
-    weights and then execute the trades at time t.
-    """
-
-    prices, spread, volume, rf = load_data()
-    n_assets = prices.shape[1]
-
-    lookback = 500
-    forward_smoothing = 5
-
-    quantities = np.zeros(n_assets)
-    cash = 1e6
-
-    post_trade_cash = []
-    post_trade_quantities = []
-    timings = []
-
-    returns = prices.pct_change().dropna()
-    means = (
-        synthetic_returns(
-            prices, information_ratio=0.15, forward_smoothing=forward_smoothing
-        )
-        .shift(-1)
-        .dropna()
-    )  # At time t includes data up to t+1
-    covariance_df = returns.ewm(halflife=125).cov()  # At time t includes data up to t
-    days = returns.index
-    covariances = {}
-    for day in days:
-        covariances[day] = covariance_df.loc[day]
-
-    for t in range(lookback, len(prices) - forward_smoothing):
-        start_time = time.perf_counter()
-
-        day = prices.index[t]
-
-        if verbose:
-            print(f"Day {t} of {len(prices)-forward_smoothing}, {day}")
-
-        prices_t = prices.iloc[t - lookback : t + 1]  # Up to t
-        spread_t = spread.iloc[t - lookback : t + 1]
-        volume_t = volume.iloc[t - lookback : t + 1]
-
-        mean_t = means.loc[day]  # Forecast for return t to t+1
-        covariance_t = covariances[day]  # Forecast for covariance t to t+1
-
-        inputs_t = OptimizationInput(
-            prices_t,
-            mean_t,
-            covariance_t,
-            spread_t,
-            volume_t,
-            quantities,
-            cash,
-            risk_target,
-            rf.iloc[t],
-        )
-
-        w, _, problem = strategy(inputs_t)
-
-        latest_prices = prices.iloc[t]  # At t
-        latest_spread = spread.iloc[t]
-
-        cash += interest_and_fees(
-            cash, rf.iloc[t - 1], quantities, prices.iloc[t - 1], day
-        )
-        trade_quantities = create_orders(w, quantities, cash, latest_prices)
-        quantities += trade_quantities
-        cash += execute_orders(latest_prices, trade_quantities, latest_spread)
-
-        post_trade_cash.append(cash)
-        post_trade_quantities.append(quantities.copy())
-
-        # Timings
-        end_time = time.perf_counter()
-        timings.append(Timing.get_timing(start_time, end_time, problem))
-
-    post_trade_cash = pd.Series(
-        post_trade_cash, index=prices.index[lookback:-forward_smoothing]
-    )
-    post_trade_quantities = pd.DataFrame(
-        post_trade_quantities,
-        index=prices.index[lookback:-forward_smoothing],
-        columns=prices.columns,
-    )
-
-    return BacktestResult(post_trade_cash, post_trade_quantities, risk_target, timings)
-
-
-def run_markowitz(
-    strategy: callable,
-    targets: namedtuple,
-    # limits: namedtuple,
-    hyperparameters: namedtuple,
-    prices=None,
-    spread=None,
-    volume=None,
-    rf=None,
-    verbose: bool = False,
-) -> tuple[pd.Series, pd.DataFrame]:
-    """
-    Run a simplified backtest for a given strategy.
-    At time t we use data from t-lookback to t to compute the optimal portfolio
-    weights and then execute the trades at time t.
-
-    param strategy: a function that takes an OptimizationInput and returns
-    w, c, problem, problem_solved
-    param prices: a DataFrame of prices
-    param spread: a DataFrame of bid-ask spreads
-    param volume: a DataFrame of trading volumes
-    param rf: a Series of risk-free rates
-    param targets: a namedtuple of targets (T_target, L_target, risk_target)
-    param limits: a namedtuple of limits (T_max, L_max, risk_max)
-    param hyperparameters: a namedtuple of hyperparameters (gamma_hold,
-    gamma_trade, gamma_turn, gamma_risk, gamma_leverage)
-    param verbose: whether to print progress
-
-    return: tuple of BacktestResult instance and DataFrame of dual optimal values
-    """
-
-    if prices is None:
-        prices, spread, volume, rf = load_data()
-
-    n_assets = prices.shape[1]
-    lookback = 500
-    forward_smoothing = 5
-
-    # constraint_names = [
-    #     "FullInvestment",
-    #     "Cash",
-    #     "CLower",
-    #     "CUpper",
-    #     "WLower",
-    #     "WUpper",
-    #     "ZLower",
-    #     "ZUpper",
-    #     "Leverage",
-    #     "Turnover",
-    #     "Risk",
-    # ]
-
-    timings = []
-
-    returns = prices.pct_change().dropna()
-    means = (
-        synthetic_returns(
-            prices, information_ratio=0.15, forward_smoothing=forward_smoothing
-        )
-        .shift(-1)
-        .dropna()
-    )  # At time t includes data up to t+1
-    covariance_df = returns.ewm(halflife=125).cov()  # At time t includes data up to t
-    days = returns.index
-    covariances = {}
-    for day in days:
-        covariances[day] = covariance_df.loc[day]
-
-    quantities = np.zeros(n_assets)
-    cash = 10 * 1e6
-
-    # To store results
-    post_trade_cash = []
-    post_trade_quantities = []
-    # dual_optimals = (
-    #     pd.DataFrame(
-    #         columns=constraint_names,
-    #         index=prices.index[lookback:-1],
-    #     )
-    #     * np.nan
-    # )
-
-    for t in range(lookback, len(prices) - forward_smoothing):
-        start_time = time.perf_counter()
-        day = prices.index[t]
-
-        if verbose and t % 100 == 0:
-            print(f"Day {t} of {len(prices)-1}, {day}")
-
-        prices_t = prices.iloc[t - lookback : t + 1]  # Up to t
-        spread_t = spread.iloc[t - lookback : t + 1]
-        volume_t = volume.iloc[t - lookback : t + 1]
-
-        mean_t = means.loc[day]  # Forecast for return t to t+1
-        covariance_t = covariances[day]  # Forecast for covariance t to t+1
-
-        inputs_t = OptimizationInput(
-            prices_t,
-            mean_t,
-            covariance_t,
-            spread_t,
-            volume_t,
-            quantities,
-            cash,
-            # limits.risk_max,
-            rf.iloc[t],
-        )
-
-        w, _, problem, problem_solved = strategy(
-            inputs_t,
-            hyperparameters,
-            targets=targets,
-        )
-
-        latest_prices = prices.iloc[t]  # At t
-        # portfolio_value = cash + quantities @ latest_prices
-        latest_spread = spread.iloc[t]
-        # market_volume = volume.iloc[t]  # / portfolio_value
-
-        # print(1, latest_volume.max())
-        # print(2, latest_volume.min())
-        # latest_volas = np.diag(covariance_t) ** 0.5
-
-        cash += interest_and_fees(
-            cash, rf.iloc[t - 1], quantities, prices.iloc[t - 1], day
-        )
-        trade_quantities = create_orders(w, quantities, cash, latest_prices)
-        quantities += trade_quantities
-        cash += execute_orders(
-            latest_prices,
-            trade_quantities,
-            latest_spread,
-            # market_volume,
-            # latest_volas,
-            # portfolio_value,
-        )
-
-        # print(((np.abs(trade_quantities)*latest_prices)/volume.iloc[t]).mean())
-
-        post_trade_cash.append(cash)
-        post_trade_quantities.append(quantities.copy())
-
-        # if problem_solved:
-        #     for name in constraint_names:
-        #         dual_optimals.loc[day, name] = problem.constraints[
-        #             constraint_names.index(name)
-        #         ].dual_value
-
-        # Timings
-        end_time = time.perf_counter()
-        if problem_solved:
-            timings.append(Timing.get_timing(start_time, end_time, problem))
-        else:
-            timings.append(None)
-
-    post_trade_cash = pd.Series(
-        post_trade_cash, index=prices.index[lookback:-forward_smoothing]
-    )
-    post_trade_quantities = pd.DataFrame(
-        post_trade_quantities,
-        index=prices.index[lookback:-forward_smoothing],
-        columns=prices.columns,
-    )
-
-    return BacktestResult(
-        post_trade_cash, post_trade_quantities, targets.risk_target, timings
-    )
+def run_backtest():
+    # TODO: add back Philipps code
+    pass
 
 
 def create_orders(w, quantities, cash, latest_prices) -> np.array:
@@ -330,8 +69,6 @@ def execute_orders(
     latest_prices,
     trade_quantities,
     latest_spread,
-    # market_volume,
-    # latest_volas,
 ) -> float:
     sell_order_quantities = np.clip(trade_quantities, None, 0)
     buy_order_quantities = np.clip(trade_quantities, 0, None)
@@ -342,17 +79,7 @@ def execute_orders(
     sell_receipt = -sell_order_quantities @ sell_order_prices
     buy_payment = buy_order_quantities @ buy_order_prices
 
-    # # market impact cost TODO: correct???
-    # kappa_impact = latest_volas / (market_volume**0.5)
-    # # print(market_volume.max())
-    # market_cost = kappa_impact @ (
-    #     np.abs(trade_quantities * latest_prices) ** (3 / 2)
-    # )  # * portfolio_value
-
-    # print(market_cost)
-    # print(2, market_cost / portfolio_value / (0.01**2))
-
-    return sell_receipt - buy_payment  # - market_cost
+    return sell_receipt - buy_payment
 
 
 def interest_and_fees(
@@ -373,7 +100,10 @@ def interest_and_fees(
     cash_interest = cash * (1 + rf) ** days_t_to_t_minus_1 - cash
     short_valuations = np.clip(quantities, None, 0) * prices
     short_value = short_valuations.sum()
-    shorting_fee = short_value * (1 + rf) ** days_t_to_t_minus_1 - short_value
+    short_spread = 0.05 / 360
+    shorting_fee = (
+        short_value * (1 + rf + short_spread) ** days_t_to_t_minus_1 - short_value
+    )
     return cash_interest + shorting_fee
 
 
@@ -406,6 +136,7 @@ class BacktestResult:
     quantities: pd.DataFrame
     risk_target: float
     timings: list[Timing]
+    dual_optimals: pd.DataFrame = field(default_factory=pd.DataFrame)
 
     @property
     def valuations(self) -> pd.DataFrame:
