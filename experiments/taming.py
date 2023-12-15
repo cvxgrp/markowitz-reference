@@ -1,23 +1,22 @@
 import numpy as np
 import pandas as pd
 import cvxpy as cp
+
 from experiments.backtest import BacktestResult, OptimizationInput, run_backtest
 from experiments.markowitz import Data, Parameters, markowitz
+from experiments.utils import get_solver
 
 
-def basic_markowitz(inputs: OptimizationInput) -> np.ndarray:
+def basic_markowitz(inputs: OptimizationInput) -> tuple[np.ndarray, float, cp.Problem]:
     """Compute the basic Markowitz portfolio weights."""
-
-    mu, Sigma = inputs.mean.values, inputs.covariance.values
 
     w = cp.Variable(inputs.n_assets)
     c = cp.Variable()
-    objective = mu @ w
+    objective = inputs.mean.values @ w
 
-    chol = np.linalg.cholesky(Sigma)
     constraints = [
         cp.sum(w) + c == 1,
-        cp.norm2(chol.T @ w) <= inputs.risk_target,
+        cp.norm2(inputs.chol.T @ w) <= inputs.risk_target,
     ]
 
     problem = cp.Problem(cp.Maximize(objective), constraints)
@@ -26,7 +25,7 @@ def basic_markowitz(inputs: OptimizationInput) -> np.ndarray:
     return w.value, c.value, problem
 
 
-def equal_weights(inputs: OptimizationInput) -> np.ndarray:
+def equal_weights(inputs: OptimizationInput) -> tuple[np.ndarray, float, cp.Problem]:
     """Compute the equal weights portfolio."""
     n_assets = inputs.prices.shape[1]
     w = np.ones(n_assets) / (n_assets + 1)
@@ -34,36 +33,41 @@ def equal_weights(inputs: OptimizationInput) -> np.ndarray:
     return w, c, None
 
 
-def weight_limits_markowitz(inputs: OptimizationInput) -> np.ndarray:
+def weight_limits_markowitz(
+    inputs: OptimizationInput,
+) -> tuple[np.ndarray, float, cp.Problem]:
     lb = np.ones(inputs.n_assets) * (-0.05)
     ub = np.ones(inputs.n_assets) * 0.1
 
     data, param = get_basic_data_and_parameters(inputs)
 
-    param.w_lower = lb
-    param.w_upper = ub
-    param.c_lower = -0.05
-    param.c_upper = 1.0
+    param.w_min = lb
+    param.w_max = ub
+    param.c_min = -0.05
+    param.c_max = 1.0
     param.risk_target = inputs.risk_target
-    param.gamma_risk = 5.0
     return markowitz(data, param)
 
 
-def leverage_limit_markowitz(inputs: OptimizationInput) -> np.ndarray:
+def leverage_limit_markowitz(
+    inputs: OptimizationInput,
+) -> tuple[np.ndarray, float, cp.Problem]:
     data, param = get_basic_data_and_parameters(inputs)
 
-    param.L_max = 1.6
+    param.L_tar = 1.6
     return markowitz(data, param)
 
 
-def turnover_limit_markowitz(inputs: OptimizationInput) -> np.ndarray:
+def turnover_limit_markowitz(
+    inputs: OptimizationInput,
+) -> tuple[np.ndarray, float, cp.Problem]:
     data, param = get_basic_data_and_parameters(inputs)
 
-    param.T_max = 50 / 252  # Maximum TO per year
+    param.T_tar = 50 / 252  # Maximum TO per year
     return markowitz(data, param)
 
 
-def robust_markowitz(inputs: OptimizationInput) -> np.ndarray:
+def robust_markowitz(inputs: OptimizationInput) -> tuple[np.ndarray, float, cp.Problem]:
     data, param = get_basic_data_and_parameters(inputs)
     param.rho_mean = np.percentile(np.abs(inputs.mean.values), 20, axis=0) * np.ones(
         inputs.n_assets
@@ -79,18 +83,12 @@ def get_basic_data_and_parameters(
     latest_prices = inputs.prices.iloc[-1]
     portfolio_value = inputs.cash + inputs.quantities @ latest_prices
 
-    # The risk constraint is soft.
-    # For each percentage point of risk, we need to compensate with
-    # 5 percentage points of return.
-    gamma_risk = 5.0
-
     data = Data(
         w_prev=(inputs.quantities * latest_prices / portfolio_value).values,
-        c_prev=(inputs.cash / portfolio_value),
         idio_mean=np.zeros(n_assets),
         factor_mean=inputs.mean.values,
         risk_free=0,
-        factor_covariance_chol=np.linalg.cholesky(inputs.covariance.values),
+        factor_covariance_chol=inputs.chol,
         idio_volas=np.zeros(n_assets),
         F=np.eye(n_assets),
         kappa_short=np.zeros(n_assets),
@@ -99,26 +97,26 @@ def get_basic_data_and_parameters(
         kappa_impact=np.zeros(n_assets),
     )
     param = Parameters(
-        w_lower=-np.ones(data.n_assets) * 1e3,
-        w_upper=np.ones(data.n_assets) * 1e3,
-        c_lower=-1e3,
-        c_upper=1e3,
-        z_lower=-np.ones(data.n_assets) * 1e3,
-        z_upper=np.ones(data.n_assets) * 1e3,
-        T_max=1e3,
-        L_max=1e3,
+        w_min=-np.ones(data.n_assets) * 1e3,
+        w_max=np.ones(data.n_assets) * 1e3,
+        c_min=-1e3,
+        c_max=1e3,
+        z_min=-np.ones(data.n_assets) * 1e3,
+        z_max=np.ones(data.n_assets) * 1e3,
+        T_tar=1e3,
+        L_tar=1e3,
         rho_mean=np.zeros(data.n_assets),
         rho_covariance=0.0,
         gamma_hold=0.0,
         gamma_trade=0.0,
         gamma_turn=0.0,
-        gamma_risk=gamma_risk,
+        gamma_risk=0.0,
         risk_target=inputs.risk_target,
     )
     return data, param
 
 
-def main(from_checkpoint: bool = False):
+def main(from_checkpoint: bool = True) -> None:
     annualized_target = 0.10
 
     if not from_checkpoint:
@@ -150,6 +148,15 @@ def main(from_checkpoint: bool = False):
         robust_result,
     )
 
+    generate_per_year_tables(
+        equal_weights_results,
+        basic_result,
+        weight_limited_result,
+        leverage_limit_result,
+        turnover_limit_result,
+        robust_result,
+    )
+
 
 def run_all_strategies(annualized_target: float) -> None:
     equal_weights_results = run_backtest(equal_weights, 0.0, verbose=True)
@@ -158,9 +165,9 @@ def run_all_strategies(annualized_target: float) -> None:
     adjustment_factor = np.sqrt(equal_weights_results.periods_per_year)
     sigma_target = annualized_target / adjustment_factor
 
-    print("Running basic Markowitz")
-    basic_result = run_backtest(basic_markowitz, sigma_target, verbose=True)
-    basic_result.save(f"checkpoints/basic_{annualized_target}.pickle")
+    # print("Running basic Markowitz")
+    # basic_result = run_backtest(basic_markowitz, sigma_target, verbose=True)
+    # basic_result.save(f"checkpoints/basic_{annualized_target}.pickle")
 
     print("Running weight-limited Markowitz")
     weight_limited_result = run_backtest(
@@ -234,7 +241,7 @@ def generate_table(
         "Sharpe": lambda x: f"{x:.2f}",
         "Turnover": lambda x: f"{x:.1f}",
         "Leverage": lambda x: f"{x:.1f}",
-        "Drawdown": lambda x: rf"{100 * x:.1f}\%",
+        "Drawdown": lambda x: rf"{-100 * x:.1f}\%",
     }
 
     print(
@@ -244,8 +251,251 @@ def generate_table(
     )
 
 
-def get_solver():
-    return cp.MOSEK if cp.MOSEK in cp.installed_solvers() else cp.CLARABEL
+def generate_per_year_tables(
+    equal_weights_results: BacktestResult,
+    basic_results: BacktestResult,
+    weight_limited_result: BacktestResult,
+    leverage_limit_result: BacktestResult,
+    turnover_limit_result: BacktestResult,
+    robust_result: BacktestResult,
+) -> None:
+    # TODO: DRY
+
+    years = sorted(equal_weights_results.history.year.unique())
+
+    equal_subs = []
+    basic_subs = []
+    weight_limited_subs = []
+    leverage_limit_subs = []
+    turnover_limit_subs = []
+    robust_subs = []
+
+    for year in years:
+        sub_index = equal_weights_results.history.year == year
+
+        equal_subs.append(get_sub_result(equal_weights_results, sub_index))
+        basic_subs.append(get_sub_result(basic_results, sub_index))
+        weight_limited_subs.append(get_sub_result(weight_limited_result, sub_index))
+        leverage_limit_subs.append(get_sub_result(leverage_limit_result, sub_index))
+        turnover_limit_subs.append(get_sub_result(turnover_limit_result, sub_index))
+        robust_subs.append(get_sub_result(robust_result, sub_index))
+
+    mean_df = pd.concat(
+        [
+            pd.Series(
+                [result.mean_return for result in equal_subs], index=years, name="Equal"
+            ),
+            pd.Series(
+                [result.mean_return for result in basic_subs], index=years, name="Basic"
+            ),
+            pd.Series(
+                [result.mean_return for result in weight_limited_subs],
+                index=years,
+                name="Weight-limited",
+            ),
+            pd.Series(
+                [result.mean_return for result in leverage_limit_subs],
+                index=years,
+                name="Leverage-limited",
+            ),
+            pd.Series(
+                [result.mean_return for result in turnover_limit_subs],
+                index=years,
+                name="Turnover-limited",
+            ),
+            pd.Series(
+                [result.mean_return for result in robust_subs],
+                index=years,
+                name="Robust",
+            ),
+        ],
+        axis=1,
+    )
+
+    print(mean_df.to_latex(float_format=lambda x: rf"{100 * x:.1f}\%"))
+
+    volatility_df = pd.concat(
+        [
+            pd.Series(
+                [result.volatility for result in equal_subs], index=years, name="Equal"
+            ),
+            pd.Series(
+                [result.volatility for result in basic_subs], index=years, name="Basic"
+            ),
+            pd.Series(
+                [result.volatility for result in weight_limited_subs],
+                index=years,
+                name="Weight-limited",
+            ),
+            pd.Series(
+                [result.volatility for result in leverage_limit_subs],
+                index=years,
+                name="Leverage-limited",
+            ),
+            pd.Series(
+                [result.volatility for result in turnover_limit_subs],
+                index=years,
+                name="Turnover-limited",
+            ),
+            pd.Series(
+                [result.volatility for result in robust_subs],
+                index=years,
+                name="Robust",
+            ),
+        ],
+        axis=1,
+    )
+
+    print(volatility_df.to_latex(float_format=lambda x: rf"{100 * x:.1f}\%"))
+
+    sharpe_df = pd.concat(
+        [
+            pd.Series(
+                [result.sharpe for result in equal_subs], index=years, name="Equal"
+            ),
+            pd.Series(
+                [result.sharpe for result in basic_subs], index=years, name="Basic"
+            ),
+            pd.Series(
+                [result.sharpe for result in weight_limited_subs],
+                index=years,
+                name="Weight-limited",
+            ),
+            pd.Series(
+                [result.sharpe for result in leverage_limit_subs],
+                index=years,
+                name="Leverage-limited",
+            ),
+            pd.Series(
+                [result.sharpe for result in turnover_limit_subs],
+                index=years,
+                name="Turnover-limited",
+            ),
+            pd.Series(
+                [result.sharpe for result in robust_subs], index=years, name="Robust"
+            ),
+        ],
+        axis=1,
+    )
+
+    print(sharpe_df.to_latex(float_format=lambda x: f"{x:.2f}"))
+
+    turnover_df = pd.concat(
+        [
+            pd.Series(
+                [result.turnover for result in equal_subs], index=years, name="Equal"
+            ),
+            pd.Series(
+                [result.turnover for result in basic_subs], index=years, name="Basic"
+            ),
+            pd.Series(
+                [result.turnover for result in weight_limited_subs],
+                index=years,
+                name="Weight-limited",
+            ),
+            pd.Series(
+                [result.turnover for result in leverage_limit_subs],
+                index=years,
+                name="Leverage-limited",
+            ),
+            pd.Series(
+                [result.turnover for result in turnover_limit_subs],
+                index=years,
+                name="Turnover-limited",
+            ),
+            pd.Series(
+                [result.turnover for result in robust_subs], index=years, name="Robust"
+            ),
+        ],
+        axis=1,
+    )
+
+    print(turnover_df.to_latex(float_format=lambda x: f"{x:.1f}"))
+
+    leverage_df = pd.concat(
+        [
+            pd.Series(
+                [result.max_leverage for result in equal_subs],
+                index=years,
+                name="Equal",
+            ),
+            pd.Series(
+                [result.max_leverage for result in basic_subs],
+                index=years,
+                name="Basic",
+            ),
+            pd.Series(
+                [result.max_leverage for result in weight_limited_subs],
+                index=years,
+                name="Weight-limited",
+            ),
+            pd.Series(
+                [result.max_leverage for result in leverage_limit_subs],
+                index=years,
+                name="Leverage-limited",
+            ),
+            pd.Series(
+                [result.max_leverage for result in turnover_limit_subs],
+                index=years,
+                name="Turnover-limited",
+            ),
+            pd.Series(
+                [result.max_leverage for result in robust_subs],
+                index=years,
+                name="Robust",
+            ),
+        ],
+        axis=1,
+    )
+
+    print(leverage_df.to_latex(float_format=lambda x: f"{x:.1f}"))
+
+    drawdown_df = pd.concat(
+        [
+            pd.Series(
+                [result.max_drawdown for result in equal_subs],
+                index=years,
+                name="Equal",
+            ),
+            pd.Series(
+                [result.max_drawdown for result in basic_subs],
+                index=years,
+                name="Basic",
+            ),
+            pd.Series(
+                [result.max_drawdown for result in weight_limited_subs],
+                index=years,
+                name="Weight-limited",
+            ),
+            pd.Series(
+                [result.max_drawdown for result in leverage_limit_subs],
+                index=years,
+                name="Leverage-limited",
+            ),
+            pd.Series(
+                [result.max_drawdown for result in turnover_limit_subs],
+                index=years,
+                name="Turnover-limited",
+            ),
+            pd.Series(
+                [result.max_drawdown for result in robust_subs],
+                index=years,
+                name="Robust",
+            ),
+        ],
+        axis=1,
+    )
+
+    print(drawdown_df.to_latex(float_format=lambda x: rf"{-100 * x:.1f}\%"))
+
+
+def get_sub_result(result: BacktestResult, sub_index: pd.Series) -> BacktestResult:
+    return BacktestResult(
+        cash=result.cash.loc[sub_index],
+        quantities=result.quantities.loc[sub_index],
+        risk_target=result.risk_target,
+        timings=None,
+    )
 
 
 if __name__ == "__main__":
