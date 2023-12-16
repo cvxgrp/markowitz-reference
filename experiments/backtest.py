@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
+import os
 from pathlib import Path
 import pickle
 import time
@@ -17,10 +18,14 @@ def data_folder():
 
 
 @lru_cache(maxsize=1)
-def load_data(n=None) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     prices = pd.read_csv(data_folder() / "prices.csv", index_col=0, parse_dates=True)
     spread = pd.read_csv(data_folder() / "spreads.csv", index_col=0, parse_dates=True)
     rf = pd.read_csv(data_folder() / "rf.csv", index_col=0, parse_dates=True).iloc[:, 0]
+    if os.getenv("CI"):
+        prices = prices.iloc[:2000]
+        spread = spread.iloc[:2000]
+        rf = rf.iloc[:2000]
     return prices, spread, rf
 
 
