@@ -1,7 +1,8 @@
+import os
 import cvxpy as cp
 import numpy as np
 import pandas as pd
-from utils import generate_random_inputs
+from experiments.utils import generate_random_inputs
 
 
 def main():
@@ -11,8 +12,10 @@ def main():
     for n_assets, n_factors in scenarios:
         print(f"Running scenario with {n_assets} assets and {n_factors} factors")
         solvers = [cp.MOSEK] if fitting else [cp.CLARABEL, cp.MOSEK]
+        solvers = [s for s in solvers if s in cp.installed_solvers()]
         for solver in solvers:
-            for _ in range(1):
+            n_iters = 1 if os.environ.get("CI") else 30
+            for _ in range(n_iters):
                 problem = run_scaling(n_assets, n_factors, solver)
                 assert problem.status in {
                     cp.OPTIMAL,
