@@ -20,19 +20,8 @@ def data_folder():
 def load_data(n=None) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     prices = pd.read_csv(data_folder() / "prices.csv", index_col=0, parse_dates=True)
     spread = pd.read_csv(data_folder() / "spreads.csv", index_col=0, parse_dates=True)
-    volume = pd.read_csv(data_folder() / "volumes.csv", index_col=0, parse_dates=True)
-    rf = pd.read_csv(data_folder() / "rf.csv", index_col=0, parse_dates=True).squeeze()
-
-    # get the last n days of data
-    n = n or prices.shape[0]
-    prices = prices.tail(n)
-
-    # align the data
-    spread = spread.loc[prices.index]
-    volume = volume.loc[prices.index]
-    rf = rf.loc[prices.index]
-
-    return prices, spread, volume, rf
+    rf = pd.read_csv(data_folder() / "rf.csv", index_col=0, parse_dates=True).iloc[:, 0]
+    return prices, spread, rf
 
 
 @dataclass
@@ -43,9 +32,9 @@ class OptimizationInput:
 
     prices: pd.DataFrame
     mean: pd.Series
-    covariance: pd.DataFrame
+    chol: np.array
+    volas: np.array
     spread: pd.DataFrame
-    volume: pd.DataFrame
     quantities: np.ndarray
     cash: float
     risk_target: float
@@ -57,15 +46,22 @@ class OptimizationInput:
 
 
 def run_backtest(
-    strategy: Callable, risk_target: float, verbose: bool = False, n: int = None
-) -> tuple[pd.Series, pd.DataFrame]:
+    strategy: Callable, risk_target: float, verbose: bool = False
+) -> BacktestResult:
     """
     Run a simplified backtest for a given strategy.
     At time t we use data from t-lookback to t to compute the optimal portfolio
     weights and then execute the trades at time t.
     """
 
-    prices, spread, volume, rf = load_data(n=n)
+    prices, spread, rf = load_data()
+    training_length = 1250
+    prices, spread, rf = (
+        prices.iloc[training_length:],
+        spread.iloc[training_length:],
+        rf.iloc[training_length:],
+    )
+
     n_assets = prices.shape[1]
 
     lookback = 500
@@ -87,12 +83,15 @@ def run_backtest(
         .dropna()
     )  # At time t includes data up to t+1
     covariance_df = returns.ewm(halflife=125).cov()  # At time t includes data up to t
-    days = returns.index
+    indices = range(lookback, len(prices) - forward_smoothing)
+    days = [prices.index[t] for t in indices]
     covariances = {}
+    cholesky_factorizations = {}
     for day in days:
         covariances[day] = covariance_df.loc[day]
+        cholesky_factorizations[day] = np.linalg.cholesky(covariances[day].values)
 
-    for t in range(lookback, len(prices) - forward_smoothing):
+    for t in indices:
         start_time = time.perf_counter()
 
         day = prices.index[t]
@@ -102,17 +101,18 @@ def run_backtest(
 
         prices_t = prices.iloc[t - lookback : t + 1]  # Up to t
         spread_t = spread.iloc[t - lookback : t + 1]
-        volume_t = volume.iloc[t - lookback : t + 1]
 
         mean_t = means.loc[day]  # Forecast for return t to t+1
         covariance_t = covariances[day]  # Forecast for covariance t to t+1
+        chol_t = cholesky_factorizations[day]
+        volas_t = np.sqrt(np.diag(covariance_t.values))
 
         inputs_t = OptimizationInput(
             prices_t,
             mean_t,
-            covariance_t,
+            chol_t,
+            volas_t,
             spread_t,
-            volume_t,
             quantities,
             cash,
             risk_target,
@@ -191,7 +191,10 @@ def interest_and_fees(
     cash_interest = cash * (1 + rf) ** days_t_to_t_minus_1 - cash
     short_valuations = np.clip(quantities, None, 0) * prices
     short_value = short_valuations.sum()
-    shorting_fee = short_value * (1 + rf) ** days_t_to_t_minus_1 - short_value
+    short_spread = 0.05 / 360
+    shorting_fee = (
+        short_value * (1 + rf + short_spread) ** days_t_to_t_minus_1 - short_value
+    )
     return cash_interest + shorting_fee
 
 
@@ -255,12 +258,16 @@ class BacktestResult:
         return self.valuations.div(self.portfolio_value, axis=0)
 
     @property
-    def turnover(self) -> float:
+    def daily_turnover(self) -> pd.Series:
         trades = self.quantities.diff()
         prices = load_data()[0].loc[self.history]
         valuation_trades = trades * prices
         relative_trades = valuation_trades.div(self.portfolio_value, axis=0)
-        return relative_trades.abs().sum(axis=1).mean() * self.periods_per_year
+        return relative_trades.abs().sum(axis=1)
+
+    @property
+    def turnover(self) -> float:
+        return self.daily_turnover.mean() * self.periods_per_year
 
     @property
     def mean_return(self) -> float:
@@ -280,7 +287,7 @@ class BacktestResult:
 
     @property
     def sharpe(self) -> float:
-        risk_free = load_data()[3].loc[self.history]
+        risk_free = load_data()[2].loc[self.history]
         excess_return = self.portfolio_returns - risk_free
         return (
             excess_return.mean() / excess_return.std() * np.sqrt(self.periods_per_year)

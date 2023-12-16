@@ -1,4 +1,5 @@
 import numpy as np
+import cvxpy as cp
 import pandas as pd
 
 
@@ -26,6 +27,24 @@ def synthetic_returns(
     synthetic_returns = alpha * (returns + noise)
 
     return synthetic_returns
+
+
+def generate_random_inputs(
+    n_assets: int, n_factors: int
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    rng = np.random.default_rng(1)
+    mean = rng.normal(0, 0.05, size=n_assets)
+
+    A = rng.uniform(-1, 1, size=(n_factors, n_factors))
+    covariance = A @ A.T
+
+    loadings = rng.normal(0, 1, size=(n_assets, n_factors))
+
+    return mean, loadings, covariance
+
+
+def get_solver():
+    return cp.MOSEK if cp.MOSEK in cp.installed_solvers() else cp.CLARABEL
 
 
 if __name__ == "__main__":

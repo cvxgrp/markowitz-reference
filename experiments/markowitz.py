@@ -20,7 +20,6 @@ import cvxpy as cp
 @dataclass
 class Data:
     w_prev: np.ndarray  # (n_assets,) array of previous asset weights
-    c_prev: float  # previous cash weight
     idio_mean: np.ndarray  # (n_assets,) array of idiosyncratic mean returns
     factor_mean: np.ndarray  # (n_factors,) array of factor mean returns
     risk_free: float  # risk-free rate
@@ -36,17 +35,23 @@ class Data:
     def n_assets(self) -> int:
         return self.w_prev.size
 
+    @property
+    def volas(self) -> np.ndarray:
+        return self.idio_volas + np.linalg.norm(
+            self.F @ self.factor_covariance_chol, axis=1
+        )
+
 
 @dataclass
 class Parameters:
-    w_lower: np.ndarray  # (n_assets,) array of lower bounds on asset weights
-    w_upper: np.ndarray  # (n_assets,) array of upper bounds on asset weights
-    c_lower: float  # lower bound on cash weight
-    c_upper: float  # upper bound on cash weight
-    z_lower: np.ndarray  # (n_assets,) array of lower bounds on trades
-    z_upper: np.ndarray  # (n_assets,) array of upper bounds on trades
-    T_max: float  # turnover target
-    L_max: float  # leverage limit
+    w_min: np.ndarray  # (n_assets,) array of lower bounds on asset weights
+    w_max: np.ndarray  # (n_assets,) array of upper bounds on asset weights
+    c_min: float  # lower bound on cash weight
+    c_max: float  # upper bound on cash weight
+    z_min: np.ndarray  # (n_assets,) array of lower bounds on trades
+    z_max: np.ndarray  # (n_assets,) array of upper bounds on trades
+    T_tar: float  # turnover target
+    L_tar: float  # leverage target
     rho_mean: np.ndarray  # (n_assets,) array of mean returns for rho
     rho_covariance: float  # uncertainty in covariance matrix
     gamma_hold: float  # holding cost
@@ -75,17 +80,11 @@ def markowitz(data: Data, param: Parameters) -> tuple[np.ndarray, float, cp.Prob
     return_uncertainty = param.rho_mean @ cp.abs(w)
     return_wc = mean_return - return_uncertainty
 
-    # asset volatilities
-    factor_volas = cp.norm2(data.F @ data.factor_covariance_chol, axis=1)
-    volas = factor_volas + data.idio_volas
-
-    # portfolio risk
+    # worst-case (robust) risk
     factor_risk = cp.norm2((data.F @ data.factor_covariance_chol).T @ w)
     idio_risk = cp.norm2(cp.multiply(data.idio_volas, w))
     risk = cp.norm2(cp.hstack([factor_risk, idio_risk]))
-
-    # worst-case (robust) risk
-    risk_uncertainty = param.rho_covariance**0.5 * volas @ cp.abs(w)
+    risk_uncertainty = param.rho_covariance**0.5 * data.volas @ cp.abs(w)
     risk_wc = cp.norm2(cp.hstack([risk, risk_uncertainty]))
 
     asset_holding_cost = data.kappa_short @ cp.pos(-w)
@@ -97,24 +96,20 @@ def markowitz(data: Data, param: Parameters) -> tuple[np.ndarray, float, cp.Prob
     trading_cost = spread_cost + impact_cost
 
     objective = (
-        return_wc
-        - param.gamma_risk * cp.pos(risk_wc - param.risk_target)
-        - param.gamma_hold * holding_cost
-        - param.gamma_trade * trading_cost
-        - param.gamma_turn * cp.pos(T - param.T_max)
+        return_wc - param.gamma_hold * holding_cost - param.gamma_trade * trading_cost
     )
 
     constraints = [
         cp.sum(w) + c == 1,
-        c == data.c_prev - cp.sum(z),
-        param.c_lower <= c,
-        c <= param.c_upper,
-        param.w_lower <= w,
-        w <= param.w_upper,
-        param.z_lower <= z,
-        z <= param.z_upper,
-        L <= param.L_max,
-        T <= param.T_max,
+        param.w_min <= w,
+        w <= param.w_max,
+        L <= param.L_tar,
+        param.c_min <= c,
+        c <= param.c_max,
+        param.z_min <= z,
+        z <= param.z_max,
+        T <= param.T_tar,
+        risk_wc <= param.risk_target,
     ]
 
     problem = cp.Problem(cp.Maximize(objective), constraints)
@@ -130,7 +125,6 @@ if __name__ == "__main__":
     n_assets = 10
     data = Data(
         w_prev=np.ones(n_assets) / n_assets,
-        c_prev=0.0,
         idio_mean=np.zeros(n_assets),
         factor_mean=np.zeros(n_assets),
         risk_free=0.0,
@@ -144,14 +138,14 @@ if __name__ == "__main__":
     )
 
     param = Parameters(
-        w_lower=np.zeros(n_assets),
-        w_upper=np.ones(n_assets),
-        c_lower=0.0,
-        c_upper=1.0,
-        z_lower=-np.ones(n_assets),
-        z_upper=np.ones(n_assets),
-        T_max=1.0,
-        L_max=1.0,
+        w_min=np.zeros(n_assets),
+        w_max=np.ones(n_assets),
+        c_min=0.0,
+        c_max=1.0,
+        z_min=-np.ones(n_assets),
+        z_max=np.ones(n_assets),
+        T_tar=1.0,
+        L_tar=1.0,
         rho_mean=np.zeros(n_assets),
         rho_covariance=0.0,
         gamma_hold=0.0,
@@ -161,5 +155,5 @@ if __name__ == "__main__":
         risk_target=0.0,
     )
 
-    w, c = markowitz(data, param)
+    w, c, _ = markowitz(data, param)
     print(w, c)
