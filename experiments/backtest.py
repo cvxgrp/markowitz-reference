@@ -25,7 +25,7 @@ def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]
     return prices, spread, volume, rf
 
 
-@dataclass(frozen=True)
+@dataclass
 class OptimizationInput:
     """
     At time t, we have data from t-lookback to t-1.
@@ -185,7 +185,7 @@ def interest_and_fees(
     return cash_interest + shorting_fee
 
 
-@dataclass(frozen=True)
+@dataclass
 class Timing:
     solver: float
     cvxpy: float

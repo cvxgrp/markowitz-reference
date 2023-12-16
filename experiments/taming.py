@@ -5,7 +5,7 @@ from experiments.backtest import BacktestResult, OptimizationInput, run_backtest
 from experiments.markowitz import Data, Parameters, markowitz
 
 
-def _basic_markowitz(inputs: OptimizationInput) -> np.ndarray:
+def basic_markowitz(inputs: OptimizationInput) -> np.ndarray:
     """Compute the basic Markowitz portfolio weights."""
 
     mu, Sigma = inputs.mean.values, inputs.covariance.values
@@ -21,12 +21,12 @@ def _basic_markowitz(inputs: OptimizationInput) -> np.ndarray:
     ]
 
     problem = cp.Problem(cp.Maximize(objective), constraints)
-    problem.solve(solver=_get_solver())
+    problem.solve(get_solver())
     assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
     return w.value, c.value, problem
 
 
-def _equal_weights(inputs: OptimizationInput) -> np.ndarray:
+def equal_weights(inputs: OptimizationInput) -> np.ndarray:
     """Compute the equal weights portfolio."""
     n_assets = inputs.prices.shape[1]
     w = np.ones(n_assets) / (n_assets + 1)
@@ -34,11 +34,11 @@ def _equal_weights(inputs: OptimizationInput) -> np.ndarray:
     return w, c, None
 
 
-def _weight_limits_markowitz(inputs: OptimizationInput) -> np.ndarray:
+def weight_limits_markowitz(inputs: OptimizationInput) -> np.ndarray:
     lb = np.ones(inputs.n_assets) * (-0.05)
     ub = np.ones(inputs.n_assets) * 0.1
 
-    data, param = _get_basic_data_and_parameters(inputs)
+    data, param = get_basic_data_and_parameters(inputs)
 
     param.w_lower = lb
     param.w_upper = ub
@@ -46,33 +46,33 @@ def _weight_limits_markowitz(inputs: OptimizationInput) -> np.ndarray:
     param.c_upper = 1.0
     param.risk_target = inputs.risk_target
     param.gamma_risk = 5.0
-    return markowitz(data, param, solver=_get_solver())
+    return markowitz(data, param)
 
 
-def _leverage_limit_markowitz(inputs: OptimizationInput) -> np.ndarray:
-    data, param = _get_basic_data_and_parameters(inputs)
+def leverage_limit_markowitz(inputs: OptimizationInput) -> np.ndarray:
+    data, param = get_basic_data_and_parameters(inputs)
 
     param.L_max = 1.6
-    return markowitz(data, param, solver=_get_solver())
+    return markowitz(data, param)
 
 
-def _turnover_limit_markowitz(inputs: OptimizationInput) -> np.ndarray:
-    data, param = _get_basic_data_and_parameters(inputs)
+def turnover_limit_markowitz(inputs: OptimizationInput) -> np.ndarray:
+    data, param = get_basic_data_and_parameters(inputs)
 
     param.T_max = 50 / 252  # Maximum TO per year
-    return markowitz(data, param, solver=_get_solver())
+    return markowitz(data, param)
 
 
-def _robust_markowitz(inputs: OptimizationInput) -> np.ndarray:
-    data, param = _get_basic_data_and_parameters(inputs)
+def robust_markowitz(inputs: OptimizationInput) -> np.ndarray:
+    data, param = get_basic_data_and_parameters(inputs)
     param.rho_mean = np.percentile(np.abs(inputs.mean.values), 20, axis=0) * np.ones(
         inputs.n_assets
     )
     param.rho_covariance = 0.02
-    return markowitz(data, param, solver=_get_solver())
+    return markowitz(data, param)
 
 
-def _get_basic_data_and_parameters(
+def get_basic_data_and_parameters(
     inputs: OptimizationInput,
 ) -> tuple[Data, Parameters]:
     n_assets = inputs.n_assets
@@ -122,9 +122,9 @@ def main(from_checkpoint: bool = False):
     annualized_target = 0.10
 
     if not from_checkpoint:
-        _run_all_strategies(annualized_target)
+        run_all_strategies(annualized_target)
 
-    equal_weights_results = BacktestResult.load("checkpoints/_equal_weights.pickle")
+    equal_weights_results = BacktestResult.load("checkpoints/equal_weights.pickle")
 
     basic_result = BacktestResult.load(f"checkpoints/basic_{annualized_target}.pickle")
 
@@ -141,7 +141,7 @@ def main(from_checkpoint: bool = False):
         f"checkpoints/robust_{annualized_target}.pickle"
     )
 
-    _generate_table(
+    generate_table(
         equal_weights_results,
         basic_result,
         weight_limited_result,
@@ -151,41 +151,41 @@ def main(from_checkpoint: bool = False):
     )
 
 
-def _run_all_strategies(annualized_target: float) -> None:
-    equal_weights_results = run_backtest(_equal_weights, 0.0, verbose=True)
-    equal_weights_results.save("checkpoints/_equal_weights.pickle")
+def run_all_strategies(annualized_target: float) -> None:
+    equal_weights_results = run_backtest(equal_weights, 0.0, verbose=True)
+    equal_weights_results.save("checkpoints/equal_weights.pickle")
 
     adjustment_factor = np.sqrt(equal_weights_results.periods_per_year)
     sigma_target = annualized_target / adjustment_factor
 
     print("Running basic Markowitz")
-    basic_result = run_backtest(_basic_markowitz, sigma_target, verbose=True)
+    basic_result = run_backtest(basic_markowitz, sigma_target, verbose=True)
     basic_result.save(f"checkpoints/basic_{annualized_target}.pickle")
 
     print("Running weight-limited Markowitz")
     weight_limited_result = run_backtest(
-        _weight_limits_markowitz, sigma_target, verbose=True
+        weight_limits_markowitz, sigma_target, verbose=True
     )
     weight_limited_result.save(f"checkpoints/weight_limited_{annualized_target}.pickle")
 
     print("Running leverage limit Markowitz")
     leverage_limit_result = run_backtest(
-        _leverage_limit_markowitz, sigma_target, verbose=True
+        leverage_limit_markowitz, sigma_target, verbose=True
     )
     leverage_limit_result.save(f"checkpoints/leverage_limit_{annualized_target}.pickle")
 
     print("Running turnover limit Markowitz")
     turnover_limit_result = run_backtest(
-        _turnover_limit_markowitz, sigma_target, verbose=True
+        turnover_limit_markowitz, sigma_target, verbose=True
     )
     turnover_limit_result.save(f"checkpoints/turnover_limit_{annualized_target}.pickle")
 
     print("Running robust Markowitz")
-    robust_result = run_backtest(_robust_markowitz, sigma_target, verbose=True)
+    robust_result = run_backtest(robust_markowitz, sigma_target, verbose=True)
     robust_result.save(f"checkpoints/robust_{annualized_target}.pickle")
 
 
-def _generate_table(
+def generate_table(
     equal_weights_results: BacktestResult,
     basic_results: BacktestResult,
     weight_limited_result: BacktestResult,
@@ -244,7 +244,7 @@ def _generate_table(
     )
 
 
-def _get_solver():
+def get_solver():
     return cp.MOSEK if cp.MOSEK in cp.installed_solvers() else cp.CLARABEL
 
 

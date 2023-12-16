@@ -17,7 +17,7 @@ import numpy as np
 import cvxpy as cp
 
 
-@dataclass(frozen=True)
+@dataclass
 class Data:
     w_prev: np.ndarray  # (n_assets,) array of previous asset weights
     c_prev: float  # previous cash weight
@@ -37,7 +37,6 @@ class Data:
         return self.w_prev.size
 
 
-# This class can not be frozen because some parameters are modified later in the process
 @dataclass
 class Parameters:
     w_lower: np.ndarray  # (n_assets,) array of lower bounds on asset weights
@@ -57,9 +56,7 @@ class Parameters:
     risk_target: float  # risk target as volatility
 
 
-def markowitz(
-    data: Data, param: Parameters, **kwargs
-) -> tuple[np.ndarray, float, cp.Problem]:
+def markowitz(data: Data, param: Parameters) -> tuple[np.ndarray, float, cp.Problem]:
     """
     Markowitz portfolio optimization.
     This function contains the code listing for the accompanying paper.
@@ -121,48 +118,48 @@ def markowitz(
     ]
 
     problem = cp.Problem(cp.Maximize(objective), constraints)
-    problem.solve(**kwargs)
+    problem.solve()
     assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
     return w.value, c.value, problem
 
 
-# if __name__ == "__main__":
-#     # Create empty data and parameters objects to check types and shapes,
-#     # will be replaced by example data
-#
-#     n_assets = 10
-#     data = Data(
-#         w_prev=np.ones(n_assets) / n_assets,
-#         c_prev=0.0,
-#         idio_mean=np.zeros(n_assets),
-#         factor_mean=np.zeros(n_assets),
-#         risk_free=0.0,
-#         factor_covariance_chol=np.zeros((n_assets, n_assets)),
-#         idio_volas=np.zeros(n_assets),
-#         F=np.zeros((n_assets, n_assets)),
-#         kappa_short=np.zeros(n_assets),
-#         kappa_borrow=0.0,
-#         kappa_spread=np.zeros(n_assets),
-#         kappa_impact=np.zeros(n_assets),
-#     )
-#
-#     param = Parameters(
-#         w_lower=np.zeros(n_assets),
-#         w_upper=np.ones(n_assets),
-#         c_lower=0.0,
-#         c_upper=1.0,
-#         z_lower=-np.ones(n_assets),
-#         z_upper=np.ones(n_assets),
-#         T_max=1.0,
-#         L_max=1.0,
-#         rho_mean=np.zeros(n_assets),
-#         rho_covariance=0.0,
-#         gamma_hold=0.0,
-#         gamma_trade=0.0,
-#         gamma_turn=0.0,
-#         gamma_risk=0.0,
-#         risk_target=0.0,
-#     )
-#
-#     w, c, _ = markowitz(data=data, param=param)
-#     print(w, c)
+if __name__ == "__main__":
+    # Create empty data and parameters objects to check types and shapes,
+    # will be replaced by example data
+
+    n_assets = 10
+    data = Data(
+        w_prev=np.ones(n_assets) / n_assets,
+        c_prev=0.0,
+        idio_mean=np.zeros(n_assets),
+        factor_mean=np.zeros(n_assets),
+        risk_free=0.0,
+        factor_covariance_chol=np.zeros((n_assets, n_assets)),
+        idio_volas=np.zeros(n_assets),
+        F=np.zeros((n_assets, n_assets)),
+        kappa_short=np.zeros(n_assets),
+        kappa_borrow=0.0,
+        kappa_spread=np.zeros(n_assets),
+        kappa_impact=np.zeros(n_assets),
+    )
+
+    param = Parameters(
+        w_lower=np.zeros(n_assets),
+        w_upper=np.ones(n_assets),
+        c_lower=0.0,
+        c_upper=1.0,
+        z_lower=-np.ones(n_assets),
+        z_upper=np.ones(n_assets),
+        T_max=1.0,
+        L_max=1.0,
+        rho_mean=np.zeros(n_assets),
+        rho_covariance=0.0,
+        gamma_hold=0.0,
+        gamma_trade=0.0,
+        gamma_turn=0.0,
+        gamma_risk=0.0,
+        risk_target=0.0,
+    )
+
+    w, c = markowitz(data, param)
+    print(w, c)
