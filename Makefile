@@ -18,8 +18,8 @@ fmt: install ## Run autoformatting and linting
 clean:  ## Clean up caches and build artifacts
 	@git clean -X -d -f
 
-.PHONY: experiment
-experiment: install ## Run all experiment
+.PHONY: experiments
+experiments: install ## Run all experiment
 	${VENV}/bin/python experiments.py
 
 .PHONY: help
