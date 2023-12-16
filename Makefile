@@ -14,17 +14,12 @@ fmt: install ## Run autoformatting and linting
 	${VENV}/bin/pre-commit install
 	${VENV}/bin/pre-commit run --all-files
 
-.PHONY: test
-test: install ## Run tests
-	${VENV}/bin/pip install pytest
-	${VENV}/bin/pytest tests
-
 .PHONY: clean
 clean:  ## Clean up caches and build artifacts
 	@git clean -X -d -f
 
-.PHONY: experiment
-experiment: install ## Run all experiment
+.PHONY: experiments
+experiments: install ## Run all experiment
 	${VENV}/bin/python experiments.py
 
 .PHONY: help

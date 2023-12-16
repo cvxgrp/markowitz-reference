@@ -541,12 +541,12 @@ def run_hard_backtest(
 
     if prices is None:
         train_len = 1250
-        prices, spread, volume, rf = load_data()
-        prices, spread, volume, rf = (
+        prices, spread, rf, volume = load_data()
+        prices, spread, rf, volume = (
             prices.iloc[train_len:],
             spread.iloc[train_len:],
-            volume.iloc[train_len:],
             rf.iloc[train_len:],
+            volume.iloc[train_len:],
         )
 
     n_assets = prices.shape[1]
@@ -705,12 +705,12 @@ def run_soft_backtest(
 
     if prices is None:
         train_len = 1250
-        prices, spread, volume, rf = load_data()
-        prices, spread, volume, rf = (
+        prices, spread, rf, volume = load_data()
+        prices, spread, rf, volume = (
             prices.iloc[train_len:],
             spread.iloc[train_len:],
-            volume.iloc[train_len:],
             rf.iloc[train_len:],
+            volume.iloc[train_len:],
         )
 
     n_assets = prices.shape[1]
