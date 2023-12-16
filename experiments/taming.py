@@ -116,7 +116,7 @@ def get_basic_data_and_parameters(
     return data, param
 
 
-def main(from_checkpoint: bool = False) -> None:
+def main(from_checkpoint: bool = True) -> None:
     annualized_target = 0.10
 
     if not from_checkpoint:
@@ -203,7 +203,6 @@ def generate_table(
     turnover_limit_result: BacktestResult,
     robust_result: BacktestResult,
 ) -> None:
-    # Table 1
     df = pd.DataFrame(
         index=[
             "Equal weight",
@@ -262,8 +261,6 @@ def generate_per_year_tables(
     turnover_limit_result: BacktestResult,
     robust_result: BacktestResult,
 ) -> None:
-    # TODO: DRY
-
     years = sorted(equal_weights_results.history.year.unique())
 
     equal_subs = []
@@ -283,213 +280,77 @@ def generate_per_year_tables(
         turnover_limit_subs.append(get_sub_result(turnover_limit_result, sub_index))
         robust_subs.append(get_sub_result(robust_result, sub_index))
 
-    mean_df = pd.concat(
-        [
-            pd.Series(
-                [result.mean_return for result in equal_subs], index=years, name="Equal"
-            ),
-            pd.Series(
-                [result.mean_return for result in basic_subs], index=years, name="Basic"
-            ),
-            pd.Series(
-                [result.mean_return for result in weight_limited_subs],
-                index=years,
-                name="Weight-limited",
-            ),
-            pd.Series(
-                [result.mean_return for result in leverage_limit_subs],
-                index=years,
-                name="Leverage-limited",
-            ),
-            pd.Series(
-                [result.mean_return for result in turnover_limit_subs],
-                index=years,
-                name="Turnover-limited",
-            ),
-            pd.Series(
-                [result.mean_return for result in robust_subs],
-                index=years,
-                name="Robust",
-            ),
-        ],
-        axis=1,
+    process_dataframes(
+        equal_subs,
+        basic_subs,
+        weight_limited_subs,
+        leverage_limit_subs,
+        turnover_limit_subs,
+        robust_subs,
+        years,
     )
 
-    print(mean_df.to_latex(float_format=lambda x: rf"{100 * x:.1f}\%"))
 
-    volatility_df = pd.concat(
-        [
-            pd.Series(
-                [result.volatility for result in equal_subs], index=years, name="Equal"
-            ),
-            pd.Series(
-                [result.volatility for result in basic_subs], index=years, name="Basic"
-            ),
-            pd.Series(
-                [result.volatility for result in weight_limited_subs],
-                index=years,
-                name="Weight-limited",
-            ),
-            pd.Series(
-                [result.volatility for result in leverage_limit_subs],
-                index=years,
-                name="Leverage-limited",
-            ),
-            pd.Series(
-                [result.volatility for result in turnover_limit_subs],
-                index=years,
-                name="Turnover-limited",
-            ),
-            pd.Series(
-                [result.volatility for result in robust_subs],
-                index=years,
-                name="Robust",
-            ),
-        ],
-        axis=1,
+def create_dataframe(subsets, years, attr, names, formatter):
+    series_list = [
+        pd.Series([getattr(result, attr) for result in subset], index=years, name=name)
+        for subset, name in zip(subsets, names)
+    ]
+    df = pd.concat(series_list, axis=1)
+    print(df.applymap(formatter).to_latex())
+
+
+def process_dataframes(
+    equal_subs,
+    basic_subs,
+    weight_limited_subs,
+    leverage_limit_subs,
+    turnover_limit_subs,
+    robust_subs,
+    years,
+):
+    subsets = [
+        equal_subs,
+        basic_subs,
+        weight_limited_subs,
+        leverage_limit_subs,
+        turnover_limit_subs,
+        robust_subs,
+    ]
+    names = [
+        "Equal",
+        "Basic",
+        "Weight-limited",
+        "Leverage-limited",
+        "Turnover-limited",
+        "Robust",
+    ]
+
+    # Mean
+    create_dataframe(
+        subsets, years, "mean_return", names, formatter=lambda x: rf"{100 * x:.1f}\%"
     )
 
-    print(volatility_df.to_latex(float_format=lambda x: rf"{100 * x:.1f}\%"))
-
-    sharpe_df = pd.concat(
-        [
-            pd.Series(
-                [result.sharpe for result in equal_subs], index=years, name="Equal"
-            ),
-            pd.Series(
-                [result.sharpe for result in basic_subs], index=years, name="Basic"
-            ),
-            pd.Series(
-                [result.sharpe for result in weight_limited_subs],
-                index=years,
-                name="Weight-limited",
-            ),
-            pd.Series(
-                [result.sharpe for result in leverage_limit_subs],
-                index=years,
-                name="Leverage-limited",
-            ),
-            pd.Series(
-                [result.sharpe for result in turnover_limit_subs],
-                index=years,
-                name="Turnover-limited",
-            ),
-            pd.Series(
-                [result.sharpe for result in robust_subs], index=years, name="Robust"
-            ),
-        ],
-        axis=1,
+    # Volatility
+    create_dataframe(
+        subsets, years, "volatility", names, formatter=lambda x: rf"{100 * x:.1f}\%"
     )
 
-    print(sharpe_df.to_latex(float_format=lambda x: f"{x:.2f}"))
+    # Sharpe Ratio
+    create_dataframe(subsets, years, "sharpe", names, formatter=lambda x: f"{x:.2f}")
 
-    turnover_df = pd.concat(
-        [
-            pd.Series(
-                [result.turnover for result in equal_subs], index=years, name="Equal"
-            ),
-            pd.Series(
-                [result.turnover for result in basic_subs], index=years, name="Basic"
-            ),
-            pd.Series(
-                [result.turnover for result in weight_limited_subs],
-                index=years,
-                name="Weight-limited",
-            ),
-            pd.Series(
-                [result.turnover for result in leverage_limit_subs],
-                index=years,
-                name="Leverage-limited",
-            ),
-            pd.Series(
-                [result.turnover for result in turnover_limit_subs],
-                index=years,
-                name="Turnover-limited",
-            ),
-            pd.Series(
-                [result.turnover for result in robust_subs], index=years, name="Robust"
-            ),
-        ],
-        axis=1,
+    # Turnover
+    create_dataframe(subsets, years, "turnover", names, formatter=lambda x: f"{x:.1f}")
+
+    # Leverage
+    create_dataframe(
+        subsets, years, "max_leverage", names, formatter=lambda x: f"{x:.1f}"
     )
 
-    print(turnover_df.to_latex(float_format=lambda x: f"{x:.1f}"))
-
-    leverage_df = pd.concat(
-        [
-            pd.Series(
-                [result.max_leverage for result in equal_subs],
-                index=years,
-                name="Equal",
-            ),
-            pd.Series(
-                [result.max_leverage for result in basic_subs],
-                index=years,
-                name="Basic",
-            ),
-            pd.Series(
-                [result.max_leverage for result in weight_limited_subs],
-                index=years,
-                name="Weight-limited",
-            ),
-            pd.Series(
-                [result.max_leverage for result in leverage_limit_subs],
-                index=years,
-                name="Leverage-limited",
-            ),
-            pd.Series(
-                [result.max_leverage for result in turnover_limit_subs],
-                index=years,
-                name="Turnover-limited",
-            ),
-            pd.Series(
-                [result.max_leverage for result in robust_subs],
-                index=years,
-                name="Robust",
-            ),
-        ],
-        axis=1,
+    # Drawdown
+    create_dataframe(
+        subsets, years, "max_drawdown", names, formatter=lambda x: rf"{-100 * x:.1f}\%"
     )
-
-    print(leverage_df.to_latex(float_format=lambda x: f"{x:.1f}"))
-
-    drawdown_df = pd.concat(
-        [
-            pd.Series(
-                [result.max_drawdown for result in equal_subs],
-                index=years,
-                name="Equal",
-            ),
-            pd.Series(
-                [result.max_drawdown for result in basic_subs],
-                index=years,
-                name="Basic",
-            ),
-            pd.Series(
-                [result.max_drawdown for result in weight_limited_subs],
-                index=years,
-                name="Weight-limited",
-            ),
-            pd.Series(
-                [result.max_drawdown for result in leverage_limit_subs],
-                index=years,
-                name="Leverage-limited",
-            ),
-            pd.Series(
-                [result.max_drawdown for result in turnover_limit_subs],
-                index=years,
-                name="Turnover-limited",
-            ),
-            pd.Series(
-                [result.max_drawdown for result in robust_subs],
-                index=years,
-                name="Robust",
-            ),
-        ],
-        axis=1,
-    )
-
-    print(drawdown_df.to_latex(float_format=lambda x: rf"{-100 * x:.1f}\%"))
 
 
 def get_sub_result(result: BacktestResult, sub_index: pd.Series) -> BacktestResult:
