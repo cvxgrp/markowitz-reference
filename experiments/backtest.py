@@ -23,9 +23,9 @@ def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]
     spread = pd.read_csv(data_folder() / "spreads.csv", index_col=0, parse_dates=True)
     rf = pd.read_csv(data_folder() / "rf.csv", index_col=0, parse_dates=True).iloc[:, 0]
     if os.getenv("CI"):
-        prices = prices.iloc[:2000]
-        spread = spread.iloc[:2000]
-        rf = rf.iloc[:2000]
+        prices = prices.tail(2000)
+        spread = spread.tail(2000)
+        rf = rf.tail(2000)
     return prices, spread, rf
 
 
