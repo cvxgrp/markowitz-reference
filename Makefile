@@ -19,7 +19,7 @@ clean:  ## Clean up caches and build artifacts
 	@git clean -X -d -f
 
 .PHONY: experiments
-experiment: install ## Run all experiment
+experiments: install ## Run all experiment
 	${VENV}/bin/python experiments.py
 
 .PHONY: help
