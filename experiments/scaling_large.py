@@ -12,7 +12,7 @@ def main():
     for n_assets, n_factors in scenarios:
         print(f"Running scenario with {n_assets} assets and {n_factors} factors")
         solvers = [cp.MOSEK] if fitting else [cp.CLARABEL, cp.MOSEK]
-        solvers = [s for s in solvers if cp.installed_solvers()]
+        solvers = [s for s in solvers if s in cp.installed_solvers()]
         for solver in solvers:
             n_iters = 1 if os.environ.get("CI") else 30
             for _ in range(n_iters):
