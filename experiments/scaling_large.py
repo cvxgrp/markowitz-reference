@@ -2,7 +2,7 @@ import os
 import cvxpy as cp
 import numpy as np
 import pandas as pd
-from utils import generate_random_inputs
+from experiments.utils import generate_random_inputs
 
 
 def main():
