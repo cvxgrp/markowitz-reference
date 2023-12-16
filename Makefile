@@ -18,13 +18,9 @@ fmt: install ## Run autoformatting and linting
 clean:  ## Clean up caches and build artifacts
 	@git clean -X -d -f
 
-.PHONY: experiment
+.PHONY: experiments
 experiment: install ## Run all experiment
 	${VENV}/bin/python experiments.py
-
-.PHONY: experiment_cicd
-experiment_cicd: install ## Run all experiment
-	${VENV}/bin/python experiments_cicd.py
 
 .PHONY: help
 help:  ## Display this help screen
