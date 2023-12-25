@@ -6,7 +6,7 @@ from experiments.utils import generate_random_inputs
 
 
 def main():
-    fitting = False
+    fitting = True
     scenarios = get_scenarios(fitting=fitting)
     res = []
     for n_assets, n_factors in scenarios:
@@ -151,11 +151,13 @@ def get_scenarios(fitting=False):
             (2000, 100),
             (10000, 50),
             (10000, 100),
+            (50_000, 200),
+            (50_000, 500),
         ]
     else:
         # fine grid for fitting
-        assets = np.logspace(3, 3.5, 10, dtype=int)
-        factors = np.logspace(3, 3.5, 10, dtype=int)
+        assets = np.logspace(3, 4.7, 10, dtype=int)
+        factors = np.logspace(3, 4, 10, dtype=int)
         pairs = [(a, f) for a in assets for f in factors if a >= f]
         return pairs
 
