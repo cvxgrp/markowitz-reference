@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from markowitz import Data, Parameters, markowitz_soft
+from markowitz import Data, Parameters
 from dataclasses import dataclass
 from collections import namedtuple
 import multiprocessing as mp
@@ -97,11 +97,11 @@ def get_data_and_parameters(
 
     data = Data(
         w_prev=(inputs.quantities * latest_prices / portfolio_value),
-        c_prev=(inputs.cash / portfolio_value),
+        # c_prev=(inputs.cash / portfolio_value),
         idio_mean=np.zeros(n_assets),
         factor_mean=inputs.mean.values,
         risk_free=inputs.risk_free,
-        factor_covariance_chol=np.linalg.cholesky(inputs.covariance.values),
+        factor_covariance_chol=inputs.chol,
         idio_volas=np.zeros(n_assets),
         F=np.eye(n_assets),
         kappa_short=np.ones(n_assets) * 3 * (0.01) ** 2,  # 7.5% yearly
@@ -111,16 +111,16 @@ def get_data_and_parameters(
     )
 
     param = Parameters(
-        w_lower=w_lower,
-        w_upper=w_upper,
-        c_lower=c_lower,
-        c_upper=c_upper,
-        z_lower=z_lower * np.ones(data.n_assets),
-        z_upper=z_upper * np.ones(data.n_assets),
+        w_min=w_lower,
+        w_max=w_upper,
+        c_min=c_lower,
+        c_max=c_upper,
+        z_min=z_lower * np.ones(data.n_assets),
+        z_max=z_upper * np.ones(data.n_assets),
         # T_target=targets.T_target,
-        T_max=targets.T_max,
+        T_tar=targets.T_max,
         # L_target=targets.L_target,
-        L_max=targets.L_max,
+        L_tar=targets.L_max,
         rho_mean=np.ones(n_assets) * rho_mean,
         rho_covariance=rho_covariance,
         gamma_hold=gamma_hold,
@@ -132,6 +132,87 @@ def get_data_and_parameters(
     )
 
     return data, param
+
+
+def markowitz_soft(
+    data: Data,
+    param: Parameters,
+) -> tuple[np.ndarray, float, cp.Problem]:
+    """
+    Markowitz portfolio optimization.
+    This function contains the code listing for the accompanying paper.
+    """
+
+    w, c = cp.Variable(data.n_assets), cp.Variable()
+
+    z = w - data.w_prev
+    T = cp.norm1(z)
+    L = cp.norm1(w)
+
+    # worst-case (robust) return
+    factor_return = (data.F @ data.factor_mean).T @ w
+    idio_return = data.idio_mean @ w
+    mean_return = factor_return + idio_return + data.risk_free * c
+    return_uncertainty = param.rho_mean @ cp.abs(w)
+    return_wc = mean_return - return_uncertainty
+
+    # asset volatilities
+    factor_volas = cp.norm2(data.F @ data.factor_covariance_chol, axis=1)
+    volas = factor_volas + data.idio_volas
+
+    # portfolio risk
+    factor_risk = cp.norm2((data.F @ data.factor_covariance_chol).T @ w)
+    idio_risk = cp.norm2(cp.multiply(data.idio_volas, w))
+    risk = cp.norm2(cp.hstack([factor_risk, idio_risk]))
+
+    # worst-case (robust) risk
+    risk_uncertainty = param.rho_covariance**0.5 * volas @ cp.abs(w)
+    risk_wc = cp.norm2(cp.hstack([risk, risk_uncertainty]))
+
+    asset_holding_cost = data.kappa_short @ cp.pos(-w)
+    cash_holding_cost = data.kappa_borrow * cp.pos(-c)
+    holding_cost = asset_holding_cost + cash_holding_cost
+
+    spread_cost = data.kappa_spread @ cp.abs(z)
+    impact_cost = data.kappa_impact @ cp.power(cp.abs(z), 3 / 2)
+    trading_cost = spread_cost + impact_cost
+
+    constraints = [
+        cp.sum(w) + c == 1,
+        # c == data.c_prev - cp.sum(z),
+        param.c_min <= c,
+        c <= param.c_max,
+        param.w_min <= w,
+        w <= param.w_max,
+        param.z_min <= z,
+        z <= param.z_max,
+    ]
+
+    objective = (
+        return_wc
+        - param.gamma_risk * cp.pos(risk_wc - param.risk_target)
+        - param.gamma_hold * holding_cost
+        - param.gamma_trade * trading_cost
+        - param.gamma_turn * cp.pos(T - param.T_tar)
+        - param.gamma_leverage * cp.pos(L - param.L_tar)
+    )
+
+    problem = cp.Problem(cp.Maximize(objective), constraints)
+
+    try:
+        problem.solve(verbose=False)
+    except cp.SolverError:
+        print("SolverError")
+        print(problem.status)
+
+    try:
+        assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
+    except AssertionError:
+        print("Problem status: ", problem.status)
+
+        return data.w_prev, data.c_prev, problem, False
+
+    return w.value, c.value, problem, True
 
 
 def markowitz_hard(
@@ -182,30 +263,30 @@ def markowitz_hard(
 
     constraints = [
         cp.sum(w) + c == 1,
-        c == data.c_prev - cp.sum(z),
-        param.c_lower <= c,
-        c <= param.c_upper,
-        param.w_lower <= w,
-        w <= param.w_upper,
-        param.z_lower <= z,
-        z <= param.z_upper,
-        L <= param.L_max,
-        T <= param.T_max,
+        # c == data.c_prev - cp.sum(z),
+        param.c_min <= c,
+        c <= param.c_max,
+        param.w_min <= w,
+        w <= param.w_max,
+        param.z_min <= z,
+        z <= param.z_max,
+        L <= param.L_tar,
+        T <= param.T_tar,
         risk_wc <= param.risk_target,
     ]
 
     # Naming the constraints
     constraints[0].name = "FullInvestment"
-    constraints[1].name = "Cash"
-    constraints[2].name = "CLower"
-    constraints[3].name = "CUpper"
-    constraints[4].name = "WLower"
-    constraints[5].name = "WUpper"
-    constraints[6].name = "ZLower"
-    constraints[7].name = "ZUpper"
-    constraints[8].name = "Leverage"
-    constraints[9].name = "Turnover"
-    constraints[10].name = "Risk"
+    # constraints[1].name = "Cash"
+    constraints[1].name = "CLower"
+    constraints[2].name = "CUpper"
+    constraints[3].name = "WLower"
+    constraints[4].name = "WUpper"
+    constraints[5].name = "ZLower"
+    constraints[6].name = "ZUpper"
+    constraints[7].name = "Leverage"
+    constraints[8].name = "Turnover"
+    constraints[9].name = "Risk"
 
     problem = cp.Problem(cp.Maximize(objective), constraints)
     problem.solve()
@@ -387,9 +468,14 @@ def tune_parameters(
     parameters_to_results = {}
 
     # Initial hyperparameters
-    gamma_turns = 2.5e-3
-    gamma_leverages = 5e-4
-    gamma_risks = 5e-2
+    # gamma_turns = 2.5e-3
+    # gamma_leverages = 5e-4
+    # gamma_risks = 5e-2
+    # hyperparameters = HyperParameters(1,1, 1e-3, 2.5e-9, 2.5e-2)
+
+    gamma_turns = 1e-3
+    gamma_leverages = 2.5e-9
+    gamma_risks = 2.5e-2
 
     hyperparameter_list = [1, 1, gamma_turns, gamma_leverages, gamma_risks]
     hyperparameters = HyperParameters(*hyperparameter_list)
@@ -556,7 +642,7 @@ def run_hard_backtest(
 
     constraint_names = [
         "FullInvestment",
-        "Cash",
+        # "Cash",
         "CLower",
         "CUpper",
         "WLower",
@@ -585,16 +671,19 @@ def run_hard_backtest(
     returns = prices.pct_change().dropna()
     means = (
         synthetic_returns(
-            prices, information_ratio=0.15, forward_smoothing=forward_smoothing
+            prices, information_ratio=0.07, forward_smoothing=forward_smoothing
         )
         .shift(-1)
         .dropna()
     )  # At time t includes data up to t+1
     covariance_df = returns.ewm(halflife=125).cov()  # At time t includes data up to t
-    days = returns.index
+    indices = range(lookback, len(prices) - forward_smoothing)
+    days = [prices.index[t] for t in indices]
     covariances = {}
+    cholesky_factorizations = {}
     for day in days:
         covariances[day] = covariance_df.loc[day]
+        cholesky_factorizations[day] = np.linalg.cholesky(covariances[day].values)
 
     for t in range(lookback, len(prices) - forward_smoothing):
         start_time = time.perf_counter()
@@ -606,19 +695,21 @@ def run_hard_backtest(
 
         prices_t = prices.iloc[t - lookback : t + 1]  # Up to t
         spread_t = spread.iloc[t - lookback : t + 1]
-        volume_t = volume.iloc[t - lookback : t + 1]
 
         mean_t = means.loc[day]  # Forecast for return t to t+1
         covariance_t = covariances[day]  # Forecast for covariance t to t+1
+        chol_t = cholesky_factorizations[day]
+        volas_t = np.sqrt(np.diag(covariance_t.values))
 
         inputs_t = OptimizationInput(
             prices_t,
             mean_t,
-            covariance_t,
+            chol_t,
+            volas_t,
             spread_t,
-            volume_t,
             quantities,
             cash,
+            targets.risk_target,
             rf.iloc[t],
         )
 
@@ -722,16 +813,19 @@ def run_soft_backtest(
     returns = prices.pct_change().dropna()
     means = (
         synthetic_returns(
-            prices, information_ratio=0.15, forward_smoothing=forward_smoothing
+            prices, information_ratio=0.07, forward_smoothing=forward_smoothing
         )
         .shift(-1)
         .dropna()
     )  # At time t includes data up to t+1
     covariance_df = returns.ewm(halflife=125).cov()  # At time t includes data up to t
-    days = returns.index
+    indices = range(lookback, len(prices) - forward_smoothing)
+    days = [prices.index[t] for t in indices]
     covariances = {}
+    cholesky_factorizations = {}
     for day in days:
         covariances[day] = covariance_df.loc[day]
+        cholesky_factorizations[day] = np.linalg.cholesky(covariances[day].values)
 
     quantities = np.zeros(n_assets)
     cash = 1e6
@@ -756,20 +850,22 @@ def run_soft_backtest(
 
         prices_t = prices.iloc[t - lookback : t + 1]  # Up to t
         spread_t = spread.iloc[t - lookback : t + 1]
-        volume_t = volume.iloc[t - lookback : t + 1]
+        volume.iloc[t - lookback : t + 1]
 
         mean_t = means.loc[day]  # Forecast for return t to t+1
         covariance_t = covariances[day]  # Forecast for covariance t to t+1
+        chol_t = cholesky_factorizations[day]
+        volas_t = np.sqrt(np.diag(covariance_t.values))
 
         inputs_t = OptimizationInput(
             prices_t,
             mean_t,
-            covariance_t,
+            chol_t,
+            volas_t,
             spread_t,
-            volume_t,
             quantities,
             cash,
-            # limits.risk_max,
+            targets.risk_target,
             rf.iloc[t],
         )
 

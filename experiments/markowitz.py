@@ -52,6 +52,7 @@ class Parameters:
     z_max: np.ndarray  # (n_assets,) array of upper bounds on trades
     T_tar: float  # turnover target
     L_tar: float  # leverage target
+    risk_target: float
     rho_mean: np.ndarray  # (n_assets,) array of mean returns for rho
     rho_covariance: float  # uncertainty in covariance matrix
     gamma_hold: float  # holding cost

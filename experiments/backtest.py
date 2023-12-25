@@ -46,7 +46,7 @@ class OptimizationInput:
     spread: pd.DataFrame
     quantities: np.ndarray
     cash: float
-    # risk_target: float
+    risk_target: float
     risk_free: float
 
     @property
