@@ -146,7 +146,7 @@ def markowitz_soft(
     w, c = cp.Variable(data.n_assets), cp.Variable()
 
     z = w - data.w_prev
-    T = cp.norm1(z)
+    T = cp.norm1(z) / 2
     L = cp.norm1(w)
 
     # worst-case (robust) return
@@ -226,7 +226,7 @@ def markowitz_hard(
     w, c = cp.Variable(data.n_assets), cp.Variable()
 
     z = w - data.w_prev
-    T = cp.norm1(z)
+    T = cp.norm1(z) / 2
     L = cp.norm1(w)
 
     # worst-case (robust) return
@@ -289,7 +289,7 @@ def markowitz_hard(
     constraints[9].name = "Risk"
 
     problem = cp.Problem(cp.Maximize(objective), constraints)
-    problem.solve()
+    problem.solve(solver="MOSEK")
     assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
     return w.value, c.value, problem, True  # True means problem solved
 
@@ -447,7 +447,7 @@ def tune_parameters(
             turnover_train, turnover_test = turnovers(results)
             if verbose:
                 print(f"Turnover: {turnover_train}, {turnover_test}")
-            if turnover_train > 100:
+            if turnover_train > 50:  # TODO: change to 50?
                 return False
             # check leverage
             leverage_train, leverage_test = leverages(results)

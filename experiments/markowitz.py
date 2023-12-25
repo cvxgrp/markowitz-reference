@@ -97,7 +97,7 @@ def markowitz(
     w, c = cp.Variable(data.n_assets), cp.Variable()
 
     z = w - data.w_prev
-    T = cp.norm1(z)
+    T = cp.norm1(z) / 2
     L = cp.norm1(w)
 
     # worst-case (robust) return
