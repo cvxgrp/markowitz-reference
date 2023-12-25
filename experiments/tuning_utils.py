@@ -263,7 +263,6 @@ def markowitz_hard(
 
     constraints = [
         cp.sum(w) + c == 1,
-        # c == data.c_prev - cp.sum(z),
         param.c_min <= c,
         c <= param.c_max,
         param.w_min <= w,
@@ -277,7 +276,6 @@ def markowitz_hard(
 
     # Naming the constraints
     constraints[0].name = "FullInvestment"
-    # constraints[1].name = "Cash"
     constraints[1].name = "CLower"
     constraints[2].name = "CUpper"
     constraints[3].name = "WLower"
@@ -289,7 +287,7 @@ def markowitz_hard(
     constraints[9].name = "Risk"
 
     problem = cp.Problem(cp.Maximize(objective), constraints)
-    problem.solve(solver="MOSEK")
+    problem.solve()
     assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
     return w.value, c.value, problem, True  # True means problem solved
 
@@ -474,7 +472,7 @@ def tune_parameters(
     # hyperparameters = HyperParameters(1,1, 1e-3, 2.5e-9, 2.5e-2)
 
     gamma_turns = 1e-3
-    gamma_leverages = 2.5e-9
+    gamma_leverages = 5e-4
     gamma_risks = 2.5e-2
 
     hyperparameter_list = [1, 1, gamma_turns, gamma_leverages, gamma_risks]
@@ -482,7 +480,7 @@ def tune_parameters(
 
     # Set soft targets and limits
     targets = Targets(
-        T_max=50 / 252,
+        T_max=25 / 252,
         L_max=1.6,
         risk_target=0.1 / np.sqrt(252),
     )
@@ -642,7 +640,6 @@ def run_hard_backtest(
 
     constraint_names = [
         "FullInvestment",
-        # "Cash",
         "CLower",
         "CUpper",
         "WLower",
@@ -671,7 +668,7 @@ def run_hard_backtest(
     returns = prices.pct_change().dropna()
     means = (
         synthetic_returns(
-            prices, information_ratio=0.07, forward_smoothing=forward_smoothing
+            prices, information_ratio=0.15, forward_smoothing=forward_smoothing
         )
         .shift(-1)
         .dropna()
@@ -813,7 +810,7 @@ def run_soft_backtest(
     returns = prices.pct_change().dropna()
     means = (
         synthetic_returns(
-            prices, information_ratio=0.07, forward_smoothing=forward_smoothing
+            prices, information_ratio=0.15, forward_smoothing=forward_smoothing
         )
         .shift(-1)
         .dropna()
@@ -937,7 +934,7 @@ def main():
     hyperparameters = HyperParameters(1, 1, gamma_turns, gamma_leverages, gamma_risks)
 
     targets = Targets(
-        T_target=50 / 252,
+        T_target=25 / 252,
         L_target=1.6,
         risk_target=0.1 / np.sqrt(252),
     )

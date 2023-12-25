@@ -23,7 +23,7 @@ if __name__ == "__main__":
     )
 
     targets = Targets(
-        T_max=50 / 252,
+        T_max=25 / 252,
         L_max=1.6,
         risk_target=0.1 / np.sqrt(252),
     )
