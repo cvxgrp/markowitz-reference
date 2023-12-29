@@ -200,7 +200,7 @@ def markowitz_soft(
     problem = cp.Problem(cp.Maximize(objective), constraints)
 
     try:
-        problem.solve(verbose=False)
+        problem.solve(solver="MOSEK")
     except cp.SolverError:
         print("SolverError")
         print(problem.status)
@@ -287,7 +287,8 @@ def markowitz_hard(
     constraints[9].name = "Risk"
 
     problem = cp.Problem(cp.Maximize(objective), constraints)
-    problem.solve()
+
+    problem.solve(solver="MOSEK")
     assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
     return w.value, c.value, problem, True  # True means problem solved
 
