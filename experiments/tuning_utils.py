@@ -42,6 +42,39 @@ class Limits:
     risk_max: float
 
 
+def yearly_data():
+    prices, spread, rf, volume = load_data()
+
+    ### TUNE ONCE PER YEAR ###
+    all_prices = []
+    all_spreads = []
+    all_volumes = []
+    all_rfs = []
+
+    # retune every year
+    tuning_frequency = 250  # 1 year
+
+    t_start = 500
+    n_periods = int(np.floor(len(prices) / tuning_frequency))
+
+    for i in range(1, n_periods):  # first 500 are discarded
+        t_start = (i - 1) * tuning_frequency
+        t_end = (i - 1) * tuning_frequency + 1000
+
+        all_prices.append(prices.iloc[t_start:t_end])
+        all_spreads.append(spread.iloc[t_start:t_end])
+        all_volumes.append(volume.iloc[t_start:t_end])
+        all_rfs.append(rf.iloc[t_start:t_end])
+
+    # remove all of length less than 500
+    all_prices = [x for x in all_prices if len(x) == 1000]
+    all_spreads = [x for x in all_spreads if len(x) == 1000]
+    all_volumes = [x for x in all_volumes if len(x) == 1000]
+    all_rfs = [x for x in all_rfs if len(x) == 1000]
+
+    return all_prices, all_spreads, all_volumes, all_rfs
+
+
 def get_data_and_parameters(
     inputs: callable, hyperparameters: dataclass, targets: dataclass
 ):
@@ -413,10 +446,10 @@ def tune_parameters(
 
         turnover_train = (
             relative_trades_train.abs().sum(axis=1).mean() * results.periods_per_year
-        )
+        ) / 2
         turnover_test = (
             relative_trades_test.abs().sum(axis=1).mean() * results.periods_per_year
-        )
+        ) / 2
 
         return turnover_train, turnover_test
 
@@ -467,14 +500,9 @@ def tune_parameters(
     parameters_to_results = {}
 
     # Initial hyperparameters
-    # gamma_turns = 2.5e-3
-    # gamma_leverages = 5e-4
-    # gamma_risks = 5e-2
-    # hyperparameters = HyperParameters(1,1, 1e-3, 2.5e-9, 2.5e-2)
-
-    gamma_turns = 1e-3
+    gamma_turns = 5e-3
     gamma_leverages = 5e-4
-    gamma_risks = 2.5e-2
+    gamma_risks = 5e-2
 
     hyperparameter_list = [1, 1, gamma_turns, gamma_leverages, gamma_risks]
     hyperparameters = HyperParameters(*hyperparameter_list)
