@@ -150,6 +150,10 @@ def markowitz(
 
     problem = cp.Problem(cp.Maximize(objective), constraints)
 
+    #    problem.solve(solver=get_solver())
+    #    assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
+    #    return w.value, c.value, problem
+
     try:
         problem.solve(solver="MOSEK", verbose=False)
     except cp.SolverError:
