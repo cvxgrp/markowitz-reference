@@ -224,21 +224,23 @@ def main(from_checkpoint: bool = False, logger=None) -> None:
     sigma_target = annualized_target / np.sqrt(252)
 
     if not from_checkpoint:
-        print("Running scaling")
+        # logger.info("Running scaling")
         # scaling_markowitz_result = run_backtest(scaling_markowitz, sigma_target, verbose=True)
         # scaling_markowitz_result.save(f"checkpoints/scaling_{annualized_target}.pickle")
 
-        print("Running parameter scaling")
+        logger.info("Running parameter scaling")
 
         n_assets = load_data()[0].shape[1]
         start = time.perf_counter()
         problem, param_dict, _, _ = get_parametrized_problem(n_assets, sigma_target)
+
         try:
             for p in param_dict.values():
                 p.value = np.zeros(p.shape)
-            problem.solve(solver=get_solver())
+            problem.solve(solver=get_solver(), verbose=True)
         except cp.SolverError:
             pass
+
         end = time.perf_counter()
         print(f"First call to get_parametrized_problem took {end-start} seconds")
 
