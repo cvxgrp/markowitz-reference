@@ -113,7 +113,12 @@ def get_basic_data_and_parameters(
         gamma_turn=0.0,
         gamma_risk=0.0,
         risk_target=inputs.risk_target,
+        risk_max=1e3,
+        gamma_leverage=0.0,
+        T_target=0.0,
+        L_target=0.0,
     )
+
     return data, param
 
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 import os
 from pathlib import Path
@@ -10,6 +10,7 @@ from typing import Callable
 import numpy as np
 import cvxpy as cp
 import pandas as pd
+
 from experiments.utils import synthetic_returns
 
 
@@ -21,12 +22,16 @@ def data_folder():
 def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     prices = pd.read_csv(data_folder() / "prices.csv", index_col=0, parse_dates=True)
     spread = pd.read_csv(data_folder() / "spreads.csv", index_col=0, parse_dates=True)
+    volume = (
+        pd.read_csv(data_folder() / "volumes_shares.csv", index_col=0, parse_dates=True)
+        * prices
+    )
     rf = pd.read_csv(data_folder() / "rf.csv", index_col=0, parse_dates=True).iloc[:, 0]
     if os.getenv("CI"):
         prices = prices.tail(2000)
         spread = spread.tail(2000)
         rf = rf.tail(2000)
-    return prices, spread, rf
+    return prices, spread, rf, volume
 
 
 @dataclass
@@ -59,7 +64,7 @@ def run_backtest(
     weights and then execute the trades at time t.
     """
 
-    prices, spread, rf = load_data()
+    prices, spread, rf, _ = load_data()
     training_length = 1250
     prices, spread, rf = (
         prices.iloc[training_length:],
@@ -165,7 +170,11 @@ def create_orders(w, quantities, cash, latest_prices) -> np.array:
     return trade_quantities.values
 
 
-def execute_orders(latest_prices, trade_quantities, latest_spread) -> float:
+def execute_orders(
+    latest_prices,
+    trade_quantities,
+    latest_spread,
+) -> float:
     sell_order_quantities = np.clip(trade_quantities, None, 0)
     buy_order_quantities = np.clip(trade_quantities, 0, None)
 
@@ -232,6 +241,7 @@ class BacktestResult:
     quantities: pd.DataFrame
     risk_target: float
     timings: list[Timing]
+    dual_optimals: pd.DataFrame = field(default_factory=pd.DataFrame)
 
     @property
     def valuations(self) -> pd.DataFrame:

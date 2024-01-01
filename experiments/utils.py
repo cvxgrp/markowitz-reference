@@ -25,6 +25,8 @@ def synthetic_returns(
     """
     prices: a DataFrame of prices
     information_ratio: the desired information ratio of the synthetic returns
+    smoothing_len: the length of the smoothing window for the synthetic returns
+    seed: random seed for reproducibility
 
     returns: a DataFrame of "synthetic return predictions" computed as
     alpha*(returns+noise), where alpha=var_r / (var_r + var_eps); this is the
@@ -60,6 +62,9 @@ def generate_random_inputs(
 
 
 def get_solver():
+    if os.getenv("CI"):
+        return cp.CLARABEL
+
     return cp.MOSEK if cp.MOSEK in cp.installed_solvers() else cp.CLARABEL
 
 
