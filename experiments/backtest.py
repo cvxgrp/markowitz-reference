@@ -10,7 +10,8 @@ from typing import Callable
 import numpy as np
 import cvxpy as cp
 import pandas as pd
-from utils import synthetic_returns
+
+from experiments.utils import synthetic_returns
 
 
 def data_folder():
