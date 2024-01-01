@@ -1,8 +1,23 @@
 import os
+from pathlib import Path
 
 import numpy as np
 import cvxpy as cp
 import pandas as pd
+
+__folder = Path(__file__).parent
+
+
+def checkpoints_path():
+    return __folder.parent / "checkpoints"
+
+
+def figures_path():
+    return __folder.parent / "figures"
+
+
+def data_path():
+    return __folder.parent / "data"
 
 
 def synthetic_returns(
@@ -46,7 +61,7 @@ def generate_random_inputs(
 
 
 def get_solver():
-    # todo: check environment variable if in a Github action
+    # check environment variable if in a GitHub action
     if os.environ.get("CI"):
         return cp.CLARABEL
 
@@ -54,7 +69,7 @@ def get_solver():
 
 
 if __name__ == "__main__":
-    prices = pd.read_csv("data/prices.csv", index_col=0, parse_dates=True)
+    prices = pd.read_csv(data_path() / "prices.csv", index_col=0, parse_dates=True)
     synthetic_returns = synthetic_returns(
         prices, information_ratio=0.15, forward_smoothing=5
     )
