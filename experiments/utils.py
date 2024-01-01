@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import cvxpy as cp
 import pandas as pd
@@ -46,6 +48,9 @@ def generate_random_inputs(
 
 
 def get_solver():
+    if os.getenv("CI"):
+        return cp.CLARABEL
+
     return cp.MOSEK if cp.MOSEK in cp.installed_solvers() else cp.CLARABEL
 
 
