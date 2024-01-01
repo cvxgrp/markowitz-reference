@@ -10,18 +10,14 @@ from typing import Callable
 import numpy as np
 import cvxpy as cp
 import pandas as pd
-from experiments.utils import synthetic_returns
-
-
-def data_folder():
-    return Path(__file__).parent.parent / "data"
+from experiments.utils import synthetic_returns, data_path
 
 
 @lru_cache(maxsize=1)
 def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    prices = pd.read_csv(data_folder() / "prices.csv", index_col=0, parse_dates=True)
-    spread = pd.read_csv(data_folder() / "spreads.csv", index_col=0, parse_dates=True)
-    rf = pd.read_csv(data_folder() / "rf.csv", index_col=0, parse_dates=True).iloc[:, 0]
+    prices = pd.read_csv(data_path() / "prices.csv", index_col=0, parse_dates=True)
+    spread = pd.read_csv(data_path() / "spreads.csv", index_col=0, parse_dates=True)
+    rf = pd.read_csv(data_path() / "rf.csv", index_col=0, parse_dates=True).iloc[:, 0]
     if os.getenv("CI"):
         prices = prices.tail(2000)
         spread = spread.tail(2000)

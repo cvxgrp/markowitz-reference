@@ -5,7 +5,7 @@ import cvxpy as cp
 
 from experiments.backtest import BacktestResult, OptimizationInput, run_backtest
 from experiments.markowitz import Data, Parameters, markowitz
-from experiments.utils import get_solver
+from experiments.utils import get_solver, checkpoints_path
 
 
 def basic_markowitz(inputs: OptimizationInput) -> tuple[np.ndarray, float, cp.Problem]:
@@ -125,24 +125,28 @@ def main(from_checkpoint: bool = False, logger=None) -> None:
     if not from_checkpoint:
         run_all_strategies(annualized_target)
 
-    equal_weights_results = BacktestResult.load("checkpoints/equal_weights.pickle")
+    equal_weights_results = BacktestResult.load(
+        checkpoints_path() / "equal_weights.pickle"
+    )
 
-    basic_result = BacktestResult.load(f"checkpoints/basic_{annualized_target}.pickle")
+    basic_result = BacktestResult.load(
+        checkpoints_path() / f"basic_{annualized_target}.pickle"
+    )
 
     weight_limited_result = BacktestResult.load(
-        f"checkpoints/weight_limited_{annualized_target}.pickle"
+        checkpoints_path() / f"weight_limited_{annualized_target}.pickle"
     )
 
     leverage_limit_result = BacktestResult.load(
-        f"checkpoints/leverage_limit_{annualized_target}.pickle"
+        checkpoints_path() / f"leverage_limit_{annualized_target}.pickle"
     )
 
     turnover_limit_result = BacktestResult.load(
-        f"checkpoints/turnover_limit_{annualized_target}.pickle"
+        checkpoints_path() / f"turnover_limit_{annualized_target}.pickle"
     )
 
     robust_result = BacktestResult.load(
-        f"checkpoints/robust_{annualized_target}.pickle"
+        checkpoints_path() / f"robust_{annualized_target}.pickle"
     )
 
     generate_table(
@@ -166,36 +170,42 @@ def main(from_checkpoint: bool = False, logger=None) -> None:
 
 def run_all_strategies(annualized_target: float) -> None:
     equal_weights_results = run_backtest(equal_weights, 0.0, verbose=True)
-    equal_weights_results.save("checkpoints/equal_weights.pickle")
+    equal_weights_results.save(checkpoints_path() / "equal_weights.pickle")
 
     adjustment_factor = np.sqrt(equal_weights_results.periods_per_year)
     sigma_target = annualized_target / adjustment_factor
 
     print("Running basic Markowitz")
     basic_result = run_backtest(basic_markowitz, sigma_target, verbose=True)
-    basic_result.save(f"checkpoints/basic_{annualized_target}.pickle")
+    basic_result.save(checkpoints_path() / f"basic_{annualized_target}.pickle")
 
     print("Running weight-limited Markowitz")
     weight_limited_result = run_backtest(
         weight_limits_markowitz, sigma_target, verbose=True
     )
-    weight_limited_result.save(f"checkpoints/weight_limited_{annualized_target}.pickle")
+    weight_limited_result.save(
+        checkpoints_path() / f"weight_limited_{annualized_target}.pickle"
+    )
 
     print("Running leverage limit Markowitz")
     leverage_limit_result = run_backtest(
         leverage_limit_markowitz, sigma_target, verbose=True
     )
-    leverage_limit_result.save(f"checkpoints/leverage_limit_{annualized_target}.pickle")
+    leverage_limit_result.save(
+        checkpoints_path() / f"leverage_limit_{annualized_target}.pickle"
+    )
 
     print("Running turnover limit Markowitz")
     turnover_limit_result = run_backtest(
         turnover_limit_markowitz, sigma_target, verbose=True
     )
-    turnover_limit_result.save(f"checkpoints/turnover_limit_{annualized_target}.pickle")
+    turnover_limit_result.save(
+        checkpoints_path() / f"turnover_limit_{annualized_target}.pickle"
+    )
 
     print("Running robust Markowitz")
     robust_result = run_backtest(robust_markowitz, sigma_target, verbose=True)
-    robust_result.save(f"checkpoints/robust_{annualized_target}.pickle")
+    robust_result.save(checkpoints_path() / f"robust_{annualized_target}.pickle")
 
 
 def generate_table(
