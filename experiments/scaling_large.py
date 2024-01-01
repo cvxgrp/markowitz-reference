@@ -1,12 +1,17 @@
 import os
+
+import loguru
 import cvxpy as cp
 import numpy as np
 import pandas as pd
+
 from experiments.utils import generate_random_inputs
 
 
-def main():
+def main(logger=None):
+    logger = logger or loguru.logger
     fitting = True
+
     scenarios = get_scenarios(fitting=fitting)
     res = []
     for n_assets, n_factors in scenarios:

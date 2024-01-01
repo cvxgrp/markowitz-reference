@@ -1,14 +1,24 @@
 import os
-from pathlib import Path
+from loguru import logger
+
 
 from experiments.taming import main as taming_main
 from experiments.scaling_small import main as scaling_small_main
 from experiments.scaling_large import main as scaling_large_main
+from experiments.utils import figures_path, checkpoints_path
 
 if __name__ == "__main__":
-    Path("checkpoints").mkdir(exist_ok=True)
-    Path("figures").mkdir(exist_ok=True)
-    scaling_small_main()
+    logger.info("Welcome to ...")
+
+    logger.debug("Create paths for checkpoints and figures")
+    checkpoints_path().mkdir(exist_ok=True)
+    figures_path().mkdir(exist_ok=True)
+
+    logger.debug("Run experiments")
+    scaling_small_main(logger=logger)
+
     if not os.getenv("CI"):
-        scaling_large_main()
-        taming_main()
+        # Large scale experiments require in particular a Mosek license
+        # Hence we do not perform them on a GitHub CI server
+        scaling_large_main(logger=logger)
+        taming_main(logger=logger)
