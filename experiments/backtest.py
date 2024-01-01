@@ -21,7 +21,9 @@ def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]
     prices = pd.read_csv(data_path() / "prices.csv", index_col=0, parse_dates=True)
     spread = pd.read_csv(data_path() / "spreads.csv", index_col=0, parse_dates=True)
     rf = pd.read_csv(data_path() / "rf.csv", index_col=0, parse_dates=True).iloc[:, 0]
-    volume = pd.read_csv(data_path() / "volume.csv", index_col=0, parse_dates=True)
+    volume = pd.read_csv(
+        data_path() / "volumes_shares.csv", index_col=0, parse_dates=True
+    )
     if os.getenv("CI"):
         prices = prices.tail(1800)
         spread = spread.tail(1800)
