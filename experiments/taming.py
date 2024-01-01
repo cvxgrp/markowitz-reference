@@ -1,3 +1,4 @@
+import loguru
 import numpy as np
 import pandas as pd
 import cvxpy as cp
@@ -116,7 +117,9 @@ def get_basic_data_and_parameters(
     return data, param
 
 
-def main(from_checkpoint: bool = False) -> None:
+def main(from_checkpoint: bool = False, logger=None) -> None:
+    logger = logger or loguru.logger
+
     annualized_target = 0.10
 
     if not from_checkpoint:
