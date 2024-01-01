@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 import os
 from pathlib import Path
@@ -12,7 +12,9 @@ import loguru
 import numpy as np
 import cvxpy as cp
 import pandas as pd
+
 from experiments.utils import synthetic_returns, data_path
+
 
 
 @lru_cache(maxsize=1)
@@ -58,7 +60,7 @@ def run_backtest(
     """
     logger = logger or loguru.logger
 
-    prices, spread, rf = load_data()
+    prices, spread, rf, _ = load_data()
     training_length = 1250
     prices, spread, rf = (
         prices.iloc[training_length:],
@@ -164,7 +166,11 @@ def create_orders(w, quantities, cash, latest_prices) -> np.array:
     return trade_quantities.values
 
 
-def execute_orders(latest_prices, trade_quantities, latest_spread) -> float:
+def execute_orders(
+    latest_prices,
+    trade_quantities,
+    latest_spread,
+) -> float:
     sell_order_quantities = np.clip(trade_quantities, None, 0)
     buy_order_quantities = np.clip(trade_quantities, 0, None)
 
@@ -231,6 +237,7 @@ class BacktestResult:
     quantities: pd.DataFrame
     risk_target: float
     timings: list[Timing]
+    dual_optimals: pd.DataFrame = field(default_factory=pd.DataFrame)
 
     @property
     def valuations(self) -> pd.DataFrame:
