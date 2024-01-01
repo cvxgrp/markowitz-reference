@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import cvxpy as cp
 import pandas as pd
@@ -44,6 +46,10 @@ def generate_random_inputs(
 
 
 def get_solver():
+    # todo: check environment variable if in a Github action
+    if os.environ.get("CI"):
+        return cp.CLARABEL
+
     return cp.MOSEK if cp.MOSEK in cp.installed_solvers() else cp.CLARABEL
 
 
