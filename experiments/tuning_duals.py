@@ -1,7 +1,7 @@
 import numpy as np
 
-from backtest import load_data
-from tuning_utils import (
+from experiments.backtest import load_data
+from experiments.tuning_utils import (
     solve_hard_markowitz,
     run_hard_backtest,
     HyperParameters,

@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from backtest import load_data
-from tuning_utils import (
+from experiments.backtest import load_data
+from experiments.tuning_utils import (
     tune_in_parallel,
     HyperParameters,
     Targets,

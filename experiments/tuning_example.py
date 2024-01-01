@@ -2,8 +2,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
-from tuning_utils import yearly_data, full_markowitz, tune_parameters
-from backtest import load_data
+from experiments.tuning_utils import yearly_data, full_markowitz, tune_parameters
+from experiments.backtest import load_data
 
 
 if __name__ == "__main__":

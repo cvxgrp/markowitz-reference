@@ -7,7 +7,7 @@ import multiprocessing as mp
 import time
 import cvxpy as cp
 
-from backtest import (
+from experiments.backtest import (
     load_data,
     OptimizationInput,
     interest_and_fees,
@@ -16,7 +16,7 @@ from backtest import (
     Timing,
     BacktestResult,
 )
-from utils import synthetic_returns
+from experiments.utils import synthetic_returns
 
 
 @dataclass
@@ -107,23 +107,27 @@ def get_data_and_parameters(
     # Hyperparameters
     t = latest_prices.name
 
-    if type(hyperparameters.gamma_hold) == pd.Series:
+    if isinstance(hyperparameters.gamma_hold, pd.Series):
         gamma_hold = hyperparameters.gamma_hold.loc[t]
     else:
         gamma_hold = hyperparameters.gamma_hold
-    if type(hyperparameters.gamma_trade) == pd.Series:
+
+    if isinstance(hyperparameters.gamma_trade, pd.Series):
         gamma_trade = hyperparameters.gamma_trade.loc[t]
     else:
         gamma_trade = hyperparameters.gamma_trade
-    if type(hyperparameters.gamma_turn) == pd.Series:
+
+    if isinstance(hyperparameters.gamma_turn, pd.Series):
         gamma_turn = hyperparameters.gamma_turn.loc[t]
     else:
         gamma_turn = hyperparameters.gamma_turn
-    if type(hyperparameters.gamma_risk) == pd.Series:
+
+    if isinstance(hyperparameters.gamma_risk, pd.Series):
         gamma_risk = hyperparameters.gamma_risk.loc[t]
     else:
         gamma_risk = hyperparameters.gamma_risk
-    if type(hyperparameters.gamma_leverage) == pd.Series:
+
+    if isinstance(hyperparameters.gamma_leverage, pd.Series):
         gamma_leverage = hyperparameters.gamma_leverage.loc[t]
     else:
         gamma_leverage = hyperparameters.gamma_leverage
@@ -645,7 +649,7 @@ def run_hard_backtest(
     volume=None,
     rf=None,
     verbose: bool = False,
-) -> tuple[pd.Series, pd.DataFrame]:
+) -> BacktestResult:
     """
     Run a simplified backtest for a given strategy.
     At time t we use data from t-lookback to t to compute the optimal portfolio
