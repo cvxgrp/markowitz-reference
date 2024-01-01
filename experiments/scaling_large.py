@@ -1,11 +1,16 @@
 import os
+
+import loguru
 import cvxpy as cp
 import numpy as np
 import pandas as pd
+
 from experiments.utils import generate_random_inputs
 
 
-def main():
+def main(logger=None):
+    logger = logger or loguru.logger
+
     fitting = False
     scenarios = get_scenarios(fitting=fitting)
     res = []
