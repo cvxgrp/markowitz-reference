@@ -7,6 +7,8 @@ from pathlib import Path
 import pickle
 import time
 from typing import Callable
+
+import loguru
 import numpy as np
 import cvxpy as cp
 import pandas as pd
@@ -47,13 +49,14 @@ class OptimizationInput:
 
 
 def run_backtest(
-    strategy: Callable, risk_target: float, verbose: bool = False
+    strategy: Callable, risk_target: float, verbose: bool = False, logger=None
 ) -> BacktestResult:
     """
     Run a simplified backtest for a given strategy.
     At time t we use data from t-lookback to t to compute the optimal portfolio
     weights and then execute the trades at time t.
     """
+    logger = logger or loguru.logger
 
     prices, spread, rf = load_data()
     training_length = 1250
@@ -98,7 +101,7 @@ def run_backtest(
         day = prices.index[t]
 
         if verbose:
-            print(f"Day {t} of {len(prices)-forward_smoothing}, {day}")
+            logger.info(f"Day {t} of {len(prices)-forward_smoothing}, {day}")
 
         prices_t = prices.iloc[t - lookback : t + 1]  # Up to t
         spread_t = spread.iloc[t - lookback : t + 1]

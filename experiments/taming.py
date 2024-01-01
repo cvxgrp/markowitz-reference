@@ -168,18 +168,20 @@ def main(from_checkpoint: bool = False, logger=None) -> None:
     )
 
 
-def run_all_strategies(annualized_target: float) -> None:
+def run_all_strategies(annualized_target: float, logger=None) -> None:
+    logger = logger or loguru.logger
+
     equal_weights_results = run_backtest(equal_weights, 0.0, verbose=True)
     equal_weights_results.save(checkpoints_path() / "equal_weights.pickle")
 
     adjustment_factor = np.sqrt(equal_weights_results.periods_per_year)
     sigma_target = annualized_target / adjustment_factor
 
-    print("Running basic Markowitz")
+    logger.info("Running basic Markowitz")
     basic_result = run_backtest(basic_markowitz, sigma_target, verbose=True)
     basic_result.save(checkpoints_path() / f"basic_{annualized_target}.pickle")
 
-    print("Running weight-limited Markowitz")
+    logger.info("Running weight-limited Markowitz")
     weight_limited_result = run_backtest(
         weight_limits_markowitz, sigma_target, verbose=True
     )
@@ -187,7 +189,7 @@ def run_all_strategies(annualized_target: float) -> None:
         checkpoints_path() / f"weight_limited_{annualized_target}.pickle"
     )
 
-    print("Running leverage limit Markowitz")
+    logger.info("Running leverage limit Markowitz")
     leverage_limit_result = run_backtest(
         leverage_limit_markowitz, sigma_target, verbose=True
     )
@@ -195,7 +197,7 @@ def run_all_strategies(annualized_target: float) -> None:
         checkpoints_path() / f"leverage_limit_{annualized_target}.pickle"
     )
 
-    print("Running turnover limit Markowitz")
+    logger.info("Running turnover limit Markowitz")
     turnover_limit_result = run_backtest(
         turnover_limit_markowitz, sigma_target, verbose=True
     )
@@ -203,7 +205,7 @@ def run_all_strategies(annualized_target: float) -> None:
         checkpoints_path() / f"turnover_limit_{annualized_target}.pickle"
     )
 
-    print("Running robust Markowitz")
+    logger.info("Running robust Markowitz")
     robust_result = run_backtest(robust_markowitz, sigma_target, verbose=True)
     robust_result.save(checkpoints_path() / f"robust_{annualized_target}.pickle")
 
@@ -310,7 +312,7 @@ def create_dataframe(subsets, years, attr, names, formatter):
         for subset, name in zip(subsets, names)
     ]
     df = pd.concat(series_list, axis=1)
-    print(df.applymap(formatter).to_latex())
+    print(df.map(formatter).to_latex())
 
 
 def process_dataframes(

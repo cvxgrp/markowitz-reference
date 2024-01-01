@@ -21,5 +21,4 @@ if __name__ == "__main__":
         # Large scale experiments require in particular a Mosek license
         # Hence we do not perform them on a GitHub CI server
         scaling_large_main(logger=logger)
-
-    taming_main(logger=logger)
+        taming_main(logger=logger)
