@@ -5,6 +5,7 @@ import numpy as np
 import cvxpy as cp
 import pandas as pd
 
+
 __folder = Path(__file__).parent
 
 
