@@ -1,6 +1,22 @@
+from pathlib import Path
+
 import numpy as np
 import cvxpy as cp
 import pandas as pd
+
+__folder = Path(__file__).parent
+
+
+def checkpoints_path():
+    return __folder.parent / "checkpoints"
+
+
+def figures_path():
+    return __folder.parent / "figures"
+
+
+def data_path():
+    return __folder.parent / "data"
 
 
 def synthetic_returns(
