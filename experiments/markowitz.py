@@ -16,8 +16,6 @@ from dataclasses import dataclass
 import numpy as np
 import cvxpy as cp
 
-from experiments.utils import get_solver
-
 
 @dataclass
 class Data:
@@ -155,7 +153,7 @@ def markowitz(
     #    problem.solve(solver=get_solver())
     #    assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
     #    return w.value, c.value, problem
-    
+
     try:
         problem.solve(solver="MOSEK", verbose=False)
     except cp.SolverError:
@@ -170,6 +168,7 @@ def markowitz(
         return data.w_prev, data.c_prev, problem, False
 
     return w.value, c.value, problem, True
+
 
 if __name__ == "__main__":
     # Create empty data and parameters objects to check types and shapes,

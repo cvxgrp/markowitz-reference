@@ -16,7 +16,6 @@ import pandas as pd
 from experiments.utils import synthetic_returns, data_path
 
 
-
 @lru_cache(maxsize=1)
 def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     prices = pd.read_csv(data_path() / "prices.csv", index_col=0, parse_dates=True)
