@@ -7,25 +7,23 @@ from pathlib import Path
 import pickle
 import time
 from typing import Callable
+
+import loguru
 import numpy as np
 import cvxpy as cp
 import pandas as pd
-from experiments.utils import synthetic_returns
-
-
-def data_folder():
-    return Path(__file__).parent.parent / "data"
+from experiments.utils import synthetic_returns, data_path
 
 
 @lru_cache(maxsize=1)
 def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    prices = pd.read_csv(data_folder() / "prices.csv", index_col=0, parse_dates=True)
-    spread = pd.read_csv(data_folder() / "spreads.csv", index_col=0, parse_dates=True)
-    rf = pd.read_csv(data_folder() / "rf.csv", index_col=0, parse_dates=True).iloc[:, 0]
+    prices = pd.read_csv(data_path() / "prices.csv", index_col=0, parse_dates=True)
+    spread = pd.read_csv(data_path() / "spreads.csv", index_col=0, parse_dates=True)
+    rf = pd.read_csv(data_path() / "rf.csv", index_col=0, parse_dates=True).iloc[:, 0]
     if os.getenv("CI"):
-        prices = prices.tail(2000)
-        spread = spread.tail(2000)
-        rf = rf.tail(2000)
+        prices = prices.tail(1800)
+        spread = spread.tail(1800)
+        rf = rf.tail(1800)
     return prices, spread, rf
 
 
@@ -51,13 +49,14 @@ class OptimizationInput:
 
 
 def run_backtest(
-    strategy: Callable, risk_target: float, verbose: bool = False
+    strategy: Callable, risk_target: float, verbose: bool = False, logger=None
 ) -> BacktestResult:
     """
     Run a simplified backtest for a given strategy.
     At time t we use data from t-lookback to t to compute the optimal portfolio
     weights and then execute the trades at time t.
     """
+    logger = logger or loguru.logger
 
     prices, spread, rf = load_data()
     training_length = 1250
@@ -102,7 +101,7 @@ def run_backtest(
         day = prices.index[t]
 
         if verbose:
-            print(f"Day {t} of {len(prices)-forward_smoothing}, {day}")
+            logger.info(f"Day {t} of {len(prices)-forward_smoothing}, {day}")
 
         prices_t = prices.iloc[t - lookback : t + 1]  # Up to t
         spread_t = spread.iloc[t - lookback : t + 1]

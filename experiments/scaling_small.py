@@ -13,7 +13,7 @@ from experiments.backtest import (
     load_data,
     run_backtest,
 )
-from experiments.utils import get_solver
+from experiments.utils import get_solver, checkpoints_path, figures_path
 
 
 def scaling_markowitz(
@@ -214,7 +214,7 @@ def plot_timings(timings: list[Timing], specifier: str = "") -> None:
 
     plt.ylabel("Time (s)")
     plt.legend()
-    plt.savefig(f"figures/timing{specifier}.pdf")
+    plt.savefig(figures_path() / f"timing{specifier}.pdf")
     plt.show()
 
 
@@ -224,36 +224,38 @@ def main(from_checkpoint: bool = False, logger=None) -> None:
     sigma_target = annualized_target / np.sqrt(252)
 
     if not from_checkpoint:
-        print("Running scaling")
+        # logger.info("Running scaling")
         # scaling_markowitz_result = run_backtest(scaling_markowitz, sigma_target, verbose=True)
         # scaling_markowitz_result.save(f"checkpoints/scaling_{annualized_target}.pickle")
 
-        print("Running parameter scaling")
+        logger.info("Running parameter scaling")
 
         n_assets = load_data()[0].shape[1]
         start = time.perf_counter()
         problem, param_dict, _, _ = get_parametrized_problem(n_assets, sigma_target)
+
         try:
             for p in param_dict.values():
                 p.value = np.zeros(p.shape)
-            problem.solve(solver=get_solver())
+            problem.solve(solver=get_solver(), verbose=True)
         except cp.SolverError:
             pass
+
         end = time.perf_counter()
-        print(f"First call to get_parametrized_problem took {end-start} seconds")
+        logger.info(f"First call to get_parametrized_problem took {end-start} seconds")
 
         scaling_parametrized_markowitz_result = run_backtest(
             parameter_scaling_markowitz, sigma_target, verbose=True
         )
         scaling_parametrized_markowitz_result.save(
-            f"checkpoints/scaling_parametrized_{annualized_target}.pickle"
+            checkpoints_path() / f"scaling_parametrized_{annualized_target}.pickle"
         )
     else:
         # scaling_markowitz_result = BacktestResult.load(
         #     f"checkpoints/scaling_{annualized_target}.pickle"
         # )
         scaling_parametrized_markowitz_result = BacktestResult.load(
-            f"checkpoints/scaling_parametrized_{annualized_target}.pickle"
+            checkpoints_path() / f"scaling_parametrized_{annualized_target}.pickle"
         )
 
     # plot_timings(scaling_markowitz_result.timings)
@@ -261,17 +263,17 @@ def main(from_checkpoint: bool = False, logger=None) -> None:
     cvxpy_time = sum(t.cvxpy for t in scaling_parametrized_markowitz_result.timings)
     solver_time = sum(t.solver for t in scaling_parametrized_markowitz_result.timings)
     other_time = sum(t.other for t in scaling_parametrized_markowitz_result.timings)
-    print(f"Total time {total_time}")
-    print(len(scaling_parametrized_markowitz_result.timings))
-    print(
+    logger.info(f"Total time {total_time}")
+    logger.info(len(scaling_parametrized_markowitz_result.timings))
+    logger.info(
         f"Average time {total_time / len(scaling_parametrized_markowitz_result.timings)}"
     )
-    print(
+    logger.info(
         f"Average solver time {solver_time / len(scaling_parametrized_markowitz_result.timings)}"
     )
-    print(f"CVXPY time {cvxpy_time/total_time}")
-    print(f"Solver time {solver_time/total_time}")
-    print(f"Other time {other_time/total_time}")
+    logger.info(f"CVXPY time {cvxpy_time/total_time}")
+    logger.info(f"Solver time {solver_time/total_time}")
+    logger.info(f"Other time {other_time/total_time}")
     plot_timings(scaling_parametrized_markowitz_result.timings, "_parametrized")
 
 

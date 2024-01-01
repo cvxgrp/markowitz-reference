@@ -1,8 +1,10 @@
+import os
 from pathlib import Path
 
 import numpy as np
 import cvxpy as cp
 import pandas as pd
+
 
 __folder = Path(__file__).parent
 
@@ -60,11 +62,15 @@ def generate_random_inputs(
 
 
 def get_solver():
+    # check environment variable if in a GitHub action
+    if os.environ.get("CI"):
+        return cp.CLARABEL
+
     return cp.MOSEK if cp.MOSEK in cp.installed_solvers() else cp.CLARABEL
 
 
 if __name__ == "__main__":
-    prices = pd.read_csv("data/prices.csv", index_col=0, parse_dates=True)
+    prices = pd.read_csv(data_path() / "prices.csv", index_col=0, parse_dates=True)
     synthetic_returns = synthetic_returns(
         prices, information_ratio=0.15, forward_smoothing=5
     )

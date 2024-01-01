@@ -16,6 +16,8 @@ from dataclasses import dataclass
 import numpy as np
 import cvxpy as cp
 
+from experiments.utils import get_solver
+
 
 @dataclass
 class Data:
@@ -113,7 +115,7 @@ def markowitz(data: Data, param: Parameters) -> tuple[np.ndarray, float, cp.Prob
     ]
 
     problem = cp.Problem(cp.Maximize(objective), constraints)
-    problem.solve()
+    problem.solve(solver=get_solver())
     assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
     return w.value, c.value, problem
 
