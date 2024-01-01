@@ -1,8 +1,11 @@
 from functools import lru_cache
 import time
+
+import loguru
 from matplotlib import pyplot as plt
 import cvxpy as cp
 import numpy as np
+
 from experiments.backtest import (
     BacktestResult,
     OptimizationInput,
@@ -215,7 +218,8 @@ def plot_timings(timings: list[Timing], specifier: str = "") -> None:
     plt.show()
 
 
-def main(from_checkpoint: bool = False) -> None:
+def main(from_checkpoint: bool = False, logger=None) -> None:
+    logger = logger or loguru.logger
     annualized_target = 0.10
     sigma_target = annualized_target / np.sqrt(252)
 
