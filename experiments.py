@@ -22,5 +22,9 @@ if __name__ == "__main__":
 
     logger.debug("Run experiments")
     scaling_small_main(logger=logger)
-    scaling_large_main(logger=logger)
+
+    if not os.environ.get("CI"):
+        # large scale experiments require in particular a Mosek license
+        scaling_large_main(logger=logger)
+
     taming_main(logger=logger)
