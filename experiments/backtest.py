@@ -268,7 +268,7 @@ class BacktestResult:
         prices = load_data()[0].loc[self.history]
         valuation_trades = trades * prices
         relative_trades = valuation_trades.div(self.portfolio_value, axis=0)
-        return relative_trades.abs().sum(axis=1)
+        return relative_trades.abs().sum(axis=1) / 2
 
     @property
     def turnover(self) -> float:
