@@ -2,7 +2,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from experiments.tuning_utils import (
+from utils import experiment_path
+from tuning_utils import (
     HyperParameters,
     Targets,
     run_soft_backtest,
@@ -12,7 +13,9 @@ from experiments.tuning_utils import (
 if __name__ == "__main__":
     try:
         parameters_df = pd.read_csv(
-            "results/parameters.csv", index_col=0, parse_dates=True
+            experiment_path() / "tuning_results/parameters.csv",
+            index_col=0,
+            parse_dates=True,
         )
         parameters_df.index = pd.to_datetime(parameters_df.index)
     except FileNotFoundError:
@@ -217,7 +220,9 @@ if __name__ == "__main__":
         plt.FuncFormatter(lambda x, loc: "{:,}%".format(int(x * 100)))
     )
     plt.legend()
-    plt.savefig("results/yearly_means.pdf", bbox_inches="tight")
+    plt.savefig(
+        experiment_path() / "tuning_results/yearly_means.pdf", bbox_inches="tight"
+    )
     plt.show()
 
     # volas
@@ -228,7 +233,9 @@ if __name__ == "__main__":
     plt.gca().yaxis.set_major_formatter(
         plt.FuncFormatter(lambda x, loc: "{:,}%".format(int(x * 100)))
     )
-    plt.savefig("results/yearly_volas.pdf", bbox_inches="tight")
+    plt.savefig(
+        experiment_path() / "tuning_results/yearly_volas.pdf", bbox_inches="tight"
+    )
     plt.show()
 
     # sharpes
@@ -240,5 +247,7 @@ if __name__ == "__main__":
         plt.FuncFormatter(lambda x, loc: "{:,}".format(int(x)))
     )
     plt.legend()
-    plt.savefig("results/yearly_sharpes.pdf", bbox_inches="tight")
+    plt.savefig(
+        experiment_path() / "tuning_results/yearly_sharpes.pdf", bbox_inches="tight"
+    )
     plt.show()

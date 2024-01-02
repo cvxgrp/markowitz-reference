@@ -3,9 +3,9 @@ import numpy as np
 import pandas as pd
 import cvxpy as cp
 
-from experiments.backtest import BacktestResult, OptimizationInput, run_backtest
-from experiments.markowitz import Data, Parameters, markowitz
-from experiments.utils import get_solver, checkpoints_path
+from backtest import BacktestResult, OptimizationInput, run_backtest
+from markowitz import Data, Parameters, markowitz
+from utils import get_solver, checkpoints_path
 
 
 def basic_markowitz(inputs: OptimizationInput) -> tuple[np.ndarray, float, cp.Problem]:
@@ -112,13 +112,9 @@ def get_basic_data_and_parameters(
         gamma_trade=0.0,
         gamma_turn=0.0,
         gamma_risk=0.0,
-        risk_target=inputs.risk_target,
-        risk_max=1e3,
         gamma_leverage=0.0,
-        T_target=0.0,
-        L_target=0.0,
+        risk_target=inputs.risk_target,
     )
-
     return data, param
 
 

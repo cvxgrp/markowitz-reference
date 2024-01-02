@@ -52,43 +52,17 @@ class Parameters:
     z_max: np.ndarray  # (n_assets,) array of upper bounds on trades
     T_tar: float  # turnover target
     L_tar: float  # leverage target
-    risk_target: float
     rho_mean: np.ndarray  # (n_assets,) array of mean returns for rho
     rho_covariance: float  # uncertainty in covariance matrix
     gamma_hold: float  # holding cost
     gamma_trade: float  # trading cost
     gamma_turn: float  # turnover cost
     gamma_risk: float  # risk cost
-    gamma_leverage: float  # leverage gamma
+    gamma_leverage: float  # leverage cost
+    risk_target: float  # risk target as volatility
 
 
-@dataclass
-class HyperParameters:
-    gamma_hold: float
-    gamma_trade: float
-    gamma_turn: float
-    gamma_leverage: float
-    gamma_risk: float
-
-
-@dataclass
-class Targets:
-    T_target: float
-    L_target: float
-    risk_target: float
-
-
-@dataclass
-class Limits:
-    T_max: float
-    L_max: float
-    risk_max: float
-
-
-def markowitz(
-    data: Data,
-    param: Parameters,
-) -> tuple[np.ndarray, float, cp.Problem]:
+def markowitz(data: Data, param: Parameters) -> tuple[np.ndarray, float, cp.Problem]:
     """
     Markowitz portfolio optimization.
     This function contains the code listing for the accompanying paper.
@@ -97,7 +71,7 @@ def markowitz(
     w, c = cp.Variable(data.n_assets), cp.Variable()
 
     z = w - data.w_prev
-    T = cp.norm1(z) / 2
+    T = cp.norm1(z)
     L = cp.norm1(w)
 
     # worst-case (robust) return
@@ -139,35 +113,10 @@ def markowitz(
         risk_wc <= param.risk_target,
     ]
 
-    objective = (
-        return_wc
-        - param.gamma_risk * cp.pos(risk_wc - param.risk_target)
-        - param.gamma_hold * holding_cost
-        - param.gamma_trade * trading_cost
-        - param.gamma_turn * cp.pos(T - param.T_max)
-        - param.gamma_leverage * cp.pos(L - param.L_max)
-    )
-
     problem = cp.Problem(cp.Maximize(objective), constraints)
-
-    #    problem.solve(solver=get_solver())
-    #    assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
-    #    return w.value, c.value, problem
-
-    try:
-        problem.solve(solver="MOSEK", verbose=False)
-    except cp.SolverError:
-        print("SolverError")
-        print(problem.status)
-
-    try:
-        assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
-    except AssertionError:
-        print("Problem status: ", problem.status)
-
-        return data.w_prev, data.c_prev, problem, False
-
-    return w.value, c.value, problem, True
+    problem.solve()
+    assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
+    return w.value, c.value, problem
 
 
 if __name__ == "__main__":
@@ -204,6 +153,7 @@ if __name__ == "__main__":
         gamma_trade=0.0,
         gamma_turn=0.0,
         gamma_risk=0.0,
+        gamma_leverage=0.0,
         risk_target=0.0,
     )
 

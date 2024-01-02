@@ -21,6 +21,10 @@ def data_path():
     return __folder.parent / "data"
 
 
+def experiment_path():
+    return __folder.parent / "experiments"
+
+
 def synthetic_returns(
     prices: pd.DataFrame, information_ratio: float, forward_smoothing: int
 ) -> pd.DataFrame:

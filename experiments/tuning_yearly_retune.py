@@ -2,8 +2,9 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from experiments.backtest import load_data
-from experiments.tuning_utils import (
+from utils import experiment_path
+from backtest import load_data
+from tuning_utils import (
     tune_in_parallel,
     HyperParameters,
     Targets,
@@ -14,12 +15,14 @@ from experiments.tuning_utils import (
 
 
 if __name__ == "__main__":
-    # SEE IF results/parameters.csv exists
+    # SEE IF tuning_results/parameters.csv exists
     # try to load it
 
     try:
         parameters_df = pd.read_csv(
-            "results/parameters.csv", index_col=0, parse_dates=True
+            experiment_path() / "tuning_results/parameters.csv",
+            index_col=0,
+            parse_dates=True,
         )
         parameters_df.index = pd.to_datetime(parameters_df.index)
     except FileNotFoundError:
@@ -74,7 +77,7 @@ if __name__ == "__main__":
         parameters_df = parameters_df.ffill()
 
         ### Save parameters to csv ###
-        parameters_df.to_csv("results/parameters.csv")
+        parameters_df.to_csv(experiment_path() / "tuning_results/parameters.csv")
 
     hyperparameters = HyperParameters(
         gamma_hold=parameters_df.gamma_hold,
@@ -112,7 +115,10 @@ if __name__ == "__main__":
         plt.plot(parameters_df[param].iloc[tuning_len:], label=param)
         # fix y axis text to not be too wide and write as x 10^x
         plt.gca().get_yaxis().get_major_formatter().set_powerlimits((0, 1))
-        plt.savefig(f"results/tuning_{param}.pdf", bbox_inches="tight")
+        plt.savefig(
+            experiment_path() / f"tuning_results/tuning_{param}.pdf",
+            bbox_inches="tight",
+        )
         plt.show()
 
         # save figure as pdf

@@ -2,14 +2,17 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
-from experiments.tuning_utils import yearly_data, full_markowitz, tune_parameters
-from experiments.backtest import load_data
+from utils import experiment_path
+from tuning_utils import yearly_data, full_markowitz, tune_parameters
+from backtest import load_data
 
 
 if __name__ == "__main__":
     ### see if tuning_results is in results folder ###
     try:
-        tuning_results = pd.read_csv("results/tuning_results.csv", index_col=0)
+        tuning_results = pd.read_csv(
+            experiment_path() / "tuning_results/tuning_results.csv", index_col=0
+        )
         gamma_holds = tuning_results.gamma_hold.to_list()
         gamma_trades = tuning_results.gamma_trade.to_list()
         gamma_turns = tuning_results.gamma_turn.to_list()
@@ -181,7 +184,7 @@ if __name__ == "__main__":
         df.lev_test = leverages_test
         df.turn_train = turnovers_train
         df.turn_test = turnovers_test
-        df.to_csv("results/tuning_results.csv")
+        df.to_csv(experiment_path() / "tuning_results/tuning_results.csv")
 
     # sharpe
     plt.plot(backtests, sharpe_ratios_train, label="in-sample", marker="o")
@@ -192,7 +195,7 @@ if __name__ == "__main__":
     plt.gca().xaxis.set_major_locator(plt.MultipleLocator(5))
     plt.legend()
     plt.ylim(3, 7)
-    plt.savefig("results/tuning_SR.pdf", bbox_inches="tight")
+    plt.savefig(experiment_path() / "tuning_results/tuning_SR.pdf", bbox_inches="tight")
     plt.show()
 
     # vola
@@ -203,7 +206,9 @@ if __name__ == "__main__":
     plt.xticks(backtests)
     plt.gca().xaxis.set_major_locator(plt.MultipleLocator(5))
     plt.ylim(0.0, 0.12)
-    plt.savefig("results/tuning_vola.pdf", bbox_inches="tight")
+    plt.savefig(
+        experiment_path() / "tuning_results/tuning_vola.pdf", bbox_inches="tight"
+    )
     plt.show()
 
     # leverage
@@ -214,7 +219,9 @@ if __name__ == "__main__":
     plt.xticks(backtests)
     plt.gca().xaxis.set_major_locator(plt.MultipleLocator(5))
     plt.ylim(1, 2)
-    plt.savefig("results/tuning_lev.pdf", bbox_inches="tight")
+    plt.savefig(
+        experiment_path() / "tuning_results/tuning_lev.pdf", bbox_inches="tight"
+    )
     plt.show()
 
     # turnover
@@ -225,5 +232,7 @@ if __name__ == "__main__":
     plt.xticks(backtests)
     plt.gca().xaxis.set_major_locator(plt.MultipleLocator(5))
     plt.ylim(20, 50)
-    plt.savefig("results/tuning_turn.pdf", bbox_inches="tight")
+    plt.savefig(
+        experiment_path() / "tuning_results/tuning_turn.pdf", bbox_inches="tight"
+    )
     plt.show()

@@ -13,7 +13,7 @@ import numpy as np
 import cvxpy as cp
 import pandas as pd
 
-from experiments.utils import synthetic_returns, data_path
+from utils import synthetic_returns, data_path
 
 
 @lru_cache(maxsize=1)

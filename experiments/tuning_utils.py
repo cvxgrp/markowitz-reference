@@ -7,7 +7,7 @@ import multiprocessing as mp
 import time
 import cvxpy as cp
 
-from experiments.backtest import (
+from backtest import (
     load_data,
     OptimizationInput,
     interest_and_fees,
@@ -16,7 +16,7 @@ from experiments.backtest import (
     Timing,
     BacktestResult,
 )
-from experiments.utils import synthetic_returns
+from utils import synthetic_returns
 
 
 @dataclass
