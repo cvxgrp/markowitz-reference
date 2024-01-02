@@ -1,1 +1,2 @@
 line-length = 100
+ignore = ["E402"]
