@@ -207,6 +207,8 @@ if __name__ == "__main__":
         index=yearly_means_tuned.index,
     )
 
+    show_plot = False
+
     # means
     yearly_means_tuned.plot(label="Tuned Markowitz++", marker="o")
     equal_means.plot(label="Equal weights", marker="o")
@@ -215,7 +217,8 @@ if __name__ == "__main__":
     plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda x, loc: f"{int(x * 100):,}%"))
     plt.legend()
     plt.savefig(experiment_path() / "tuning_results/yearly_means.pdf", bbox_inches="tight")
-    plt.show()
+    if show_plot:
+        plt.show()
 
     # volas
     yearly_volas_tuned.plot(label="Tuned Markowitz++", marker="o")
@@ -224,7 +227,8 @@ if __name__ == "__main__":
     plt.ylabel("Volatility")
     plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda x, loc: f"{int(x * 100):,}%"))
     plt.savefig(experiment_path() / "tuning_results/yearly_volas.pdf", bbox_inches="tight")
-    plt.show()
+    if show_plot:
+        plt.show()
 
     # sharpes
     yearly_sharpes_tuned.plot(label="Tuned Markowitz++", marker="o")
@@ -234,4 +238,5 @@ if __name__ == "__main__":
     plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda x, loc: f"{int(x):,}"))
     plt.legend()
     plt.savefig(experiment_path() / "tuning_results/yearly_sharpes.pdf", bbox_inches="tight")
-    plt.show()
+    if show_plot:
+        plt.show()
