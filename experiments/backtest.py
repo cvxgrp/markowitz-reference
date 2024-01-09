@@ -1,32 +1,32 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from functools import lru_cache
 import os
-from pathlib import Path
 import pickle
 import time
+from dataclasses import dataclass, field
+from functools import lru_cache
+from pathlib import Path
 from typing import Callable
-import numpy as np
+
 import cvxpy as cp
+import numpy as np
 import pandas as pd
-from experiments.utils import synthetic_returns
-
-
-def data_folder():
-    return Path(__file__).parent.parent / "data"
+from loguru import logger
+from utils import data_path, synthetic_returns
 
 
 @lru_cache(maxsize=1)
 def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    prices = pd.read_csv(data_folder() / "prices.csv", index_col=0, parse_dates=True)
-    spread = pd.read_csv(data_folder() / "spreads.csv", index_col=0, parse_dates=True)
-    rf = pd.read_csv(data_folder() / "rf.csv", index_col=0, parse_dates=True).iloc[:, 0]
+    prices = pd.read_csv(data_path() / "prices.csv", index_col=0, parse_dates=True)
+    spread = pd.read_csv(data_path() / "spreads.csv", index_col=0, parse_dates=True)
+    rf = pd.read_csv(data_path() / "rf.csv", index_col=0, parse_dates=True).iloc[:, 0]
+    volume = pd.read_csv(data_path() / "volumes_shares.csv", index_col=0, parse_dates=True)
     if os.getenv("CI"):
-        prices = prices.tail(2000)
-        spread = spread.tail(2000)
-        rf = rf.tail(2000)
-    return prices, spread, rf
+        prices = prices.tail(1800)
+        spread = spread.tail(1800)
+        rf = rf.tail(1800)
+        volume = volume.tail(1800)
+    return prices, spread, rf, volume
 
 
 @dataclass
@@ -50,16 +50,14 @@ class OptimizationInput:
         return self.prices.shape[1]
 
 
-def run_backtest(
-    strategy: Callable, risk_target: float, verbose: bool = False
-) -> BacktestResult:
+def run_backtest(strategy: Callable, risk_target: float, verbose: bool = False) -> BacktestResult:
     """
     Run a simplified backtest for a given strategy.
     At time t we use data from t-lookback to t to compute the optimal portfolio
     weights and then execute the trades at time t.
     """
 
-    prices, spread, rf = load_data()
+    prices, spread, rf, _ = load_data()
     training_length = 1250
     prices, spread, rf = (
         prices.iloc[training_length:],
@@ -81,9 +79,7 @@ def run_backtest(
 
     returns = prices.pct_change().dropna()
     means = (
-        synthetic_returns(
-            prices, information_ratio=0.15, forward_smoothing=forward_smoothing
-        )
+        synthetic_returns(prices, information_ratio=0.15, forward_smoothing=forward_smoothing)
         .shift(-1)
         .dropna()
     )  # At time t includes data up to t+1
@@ -102,7 +98,7 @@ def run_backtest(
         day = prices.index[t]
 
         if verbose:
-            print(f"Day {t} of {len(prices)-forward_smoothing}, {day}")
+            logger.info(f"Day {t} of {len(prices)-forward_smoothing}, {day}")
 
         prices_t = prices.iloc[t - lookback : t + 1]  # Up to t
         spread_t = spread.iloc[t - lookback : t + 1]
@@ -129,9 +125,7 @@ def run_backtest(
         latest_prices = prices.iloc[t]  # At t
         latest_spread = spread.iloc[t]
 
-        cash += interest_and_fees(
-            cash, rf.iloc[t - 1], quantities, prices.iloc[t - 1], day
-        )
+        cash += interest_and_fees(cash, rf.iloc[t - 1], quantities, prices.iloc[t - 1], day)
         trade_quantities = create_orders(w, quantities, cash, latest_prices)
         quantities += trade_quantities
         cash += execute_orders(latest_prices, trade_quantities, latest_spread)
@@ -143,9 +137,7 @@ def run_backtest(
         end_time = time.perf_counter()
         timings.append(Timing.get_timing(start_time, end_time, problem))
 
-    post_trade_cash = pd.Series(
-        post_trade_cash, index=prices.index[lookback:-forward_smoothing]
-    )
+    post_trade_cash = pd.Series(post_trade_cash, index=prices.index[lookback:-forward_smoothing])
     post_trade_quantities = pd.DataFrame(
         post_trade_quantities,
         index=prices.index[lookback:-forward_smoothing],
@@ -155,7 +147,9 @@ def run_backtest(
     return BacktestResult(post_trade_cash, post_trade_quantities, risk_target, timings)
 
 
-def create_orders(w, quantities, cash, latest_prices) -> np.array:
+def create_orders(
+    w: np.array, quantities: np.array, cash: float, latest_prices: pd.Series
+) -> np.array:
     portfolio_value = cash + quantities @ latest_prices
     w_prev = (quantities * latest_prices) / portfolio_value
 
@@ -165,7 +159,11 @@ def create_orders(w, quantities, cash, latest_prices) -> np.array:
     return trade_quantities.values
 
 
-def execute_orders(latest_prices, trade_quantities, latest_spread) -> float:
+def execute_orders(
+    latest_prices: pd.Series,
+    trade_quantities: np.array,
+    latest_spread: pd.Series,
+) -> float:
     sell_order_quantities = np.clip(trade_quantities, None, 0)
     buy_order_quantities = np.clip(trade_quantities, 0, None)
 
@@ -197,9 +195,7 @@ def interest_and_fees(
     short_valuations = np.clip(quantities, None, 0) * prices
     short_value = short_valuations.sum()
     short_spread = 0.05 / 360
-    shorting_fee = (
-        short_value * (1 + rf + short_spread) ** days_t_to_t_minus_1 - short_value
-    )
+    shorting_fee = short_value * (1 + rf + short_spread) ** days_t_to_t_minus_1 - short_value
     return cash_interest + shorting_fee
 
 
@@ -210,13 +206,11 @@ class Timing:
     other: float
 
     @property
-    def total(self):
+    def total(self) -> float:
         return self.solver + self.cvxpy + self.other
 
     @classmethod
-    def get_timing(
-        cls, start_time: float, end_time: float, problem: cp.Problem | None
-    ) -> Timing:
+    def get_timing(cls, start_time: float, end_time: float, problem: cp.Problem | None) -> Timing:
         if problem:
             solver_time = problem.solver_stats.solve_time
             cvxpy_time = problem.compilation_time
@@ -232,6 +226,7 @@ class BacktestResult:
     quantities: pd.DataFrame
     risk_target: float
     timings: list[Timing]
+    dual_optimals: pd.DataFrame = field(default_factory=pd.DataFrame)
 
     @property
     def valuations(self) -> pd.DataFrame:
@@ -243,23 +238,23 @@ class BacktestResult:
         return self.cash + self.valuations.sum(axis=1)
 
     @property
-    def portfolio_returns(self):
+    def portfolio_returns(self) -> pd.Series:
         return self.portfolio_value.pct_change().dropna()
 
     @property
-    def periods_per_year(self):
+    def periods_per_year(self) -> float:
         return len(self.history) / ((self.history[-1] - self.history[0]).days / 365.25)
 
     @property
-    def history(self):
+    def history(self) -> pd.DatetimeIndex:
         return self.cash.index
 
     @property
-    def cash_weight(self):
+    def cash_weight(self) -> pd.Series:
         return self.cash / self.portfolio_value
 
     @property
-    def asset_weights(self):
+    def asset_weights(self) -> pd.DataFrame:
         return self.valuations.div(self.portfolio_value, axis=0)
 
     @property
@@ -294,9 +289,7 @@ class BacktestResult:
     def sharpe(self) -> float:
         risk_free = load_data()[2].loc[self.history]
         excess_return = self.portfolio_returns - risk_free
-        return (
-            excess_return.mean() / excess_return.std() * np.sqrt(self.periods_per_year)
-        )
+        return excess_return.mean() / excess_return.std() * np.sqrt(self.periods_per_year)
 
     def active_return(self, benchmark: BacktestResult) -> float:
         return self.mean_return - benchmark.mean_return
@@ -309,7 +302,7 @@ class BacktestResult:
     def information_ratio(self, benchmark: BacktestResult) -> float:
         return self.active_return(benchmark) / self.active_risk(benchmark)
 
-    def save(self, path: Path):
+    def save(self, path: Path) -> None:
         with open(path, "wb") as f:
             pickle.dump(self, f, pickle.HIGHEST_PROTOCOL)
 
@@ -327,7 +320,7 @@ if __name__ == "__main__":
     result = run_backtest(
         lambda _inputs: (w_targets, c_target, None), risk_target=0.0, verbose=True
     )
-    print(
+    logger.info(
         f"Mean return: {result.mean_return:.2%},\n"
         f"Volatility: {result.volatility:.2%},\n"
         f"Sharpe: {result.sharpe:.2f},\n"

@@ -1,11 +1,10 @@
-import loguru
+import cvxpy as cp
 import numpy as np
 import pandas as pd
-import cvxpy as cp
-
-from experiments.backtest import BacktestResult, OptimizationInput, run_backtest
-from experiments.markowitz import Data, Parameters, markowitz
-from experiments.utils import get_solver
+from backtest import BacktestResult, OptimizationInput, run_backtest
+from loguru import logger
+from markowitz import Data, Parameters, markowitz
+from utils import checkpoints_path, get_solver
 
 
 def basic_markowitz(inputs: OptimizationInput) -> tuple[np.ndarray, float, cp.Problem]:
@@ -64,7 +63,7 @@ def turnover_limit_markowitz(
 ) -> tuple[np.ndarray, float, cp.Problem]:
     data, param = get_basic_data_and_parameters(inputs)
 
-    param.T_tar = 50 / 252  # Maximum TO per year
+    param.T_tar = 50 / 252 / 2  # Maximum TO per year
     return markowitz(data, param)
 
 
@@ -112,38 +111,35 @@ def get_basic_data_and_parameters(
         gamma_trade=0.0,
         gamma_turn=0.0,
         gamma_risk=0.0,
+        gamma_leverage=0.0,
         risk_target=inputs.risk_target,
     )
     return data, param
 
 
-def main(from_checkpoint: bool = False, logger=None) -> None:
-    logger = logger or loguru.logger
-
+def main(from_checkpoint: bool = False) -> None:
     annualized_target = 0.10
 
     if not from_checkpoint:
         run_all_strategies(annualized_target)
 
-    equal_weights_results = BacktestResult.load("checkpoints/equal_weights.pickle")
+    equal_weights_results = BacktestResult.load(checkpoints_path() / "equal_weights.pickle")
 
-    basic_result = BacktestResult.load(f"checkpoints/basic_{annualized_target}.pickle")
+    basic_result = BacktestResult.load(checkpoints_path() / f"basic_{annualized_target}.pickle")
 
     weight_limited_result = BacktestResult.load(
-        f"checkpoints/weight_limited_{annualized_target}.pickle"
+        checkpoints_path() / f"weight_limited_{annualized_target}.pickle"
     )
 
     leverage_limit_result = BacktestResult.load(
-        f"checkpoints/leverage_limit_{annualized_target}.pickle"
+        checkpoints_path() / f"leverage_limit_{annualized_target}.pickle"
     )
 
     turnover_limit_result = BacktestResult.load(
-        f"checkpoints/turnover_limit_{annualized_target}.pickle"
+        checkpoints_path() / f"turnover_limit_{annualized_target}.pickle"
     )
 
-    robust_result = BacktestResult.load(
-        f"checkpoints/robust_{annualized_target}.pickle"
-    )
+    robust_result = BacktestResult.load(checkpoints_path() / f"robust_{annualized_target}.pickle")
 
     generate_table(
         equal_weights_results,
@@ -166,36 +162,30 @@ def main(from_checkpoint: bool = False, logger=None) -> None:
 
 def run_all_strategies(annualized_target: float) -> None:
     equal_weights_results = run_backtest(equal_weights, 0.0, verbose=True)
-    equal_weights_results.save("checkpoints/equal_weights.pickle")
+    equal_weights_results.save(checkpoints_path() / "equal_weights.pickle")
 
     adjustment_factor = np.sqrt(equal_weights_results.periods_per_year)
     sigma_target = annualized_target / adjustment_factor
 
-    print("Running basic Markowitz")
+    logger.info("Running basic Markowitz")
     basic_result = run_backtest(basic_markowitz, sigma_target, verbose=True)
-    basic_result.save(f"checkpoints/basic_{annualized_target}.pickle")
+    basic_result.save(checkpoints_path() / f"basic_{annualized_target}.pickle")
 
-    print("Running weight-limited Markowitz")
-    weight_limited_result = run_backtest(
-        weight_limits_markowitz, sigma_target, verbose=True
-    )
-    weight_limited_result.save(f"checkpoints/weight_limited_{annualized_target}.pickle")
+    logger.info("Running weight-limited Markowitz")
+    weight_limited_result = run_backtest(weight_limits_markowitz, sigma_target, verbose=True)
+    weight_limited_result.save(checkpoints_path() / f"weight_limited_{annualized_target}.pickle")
 
-    print("Running leverage limit Markowitz")
-    leverage_limit_result = run_backtest(
-        leverage_limit_markowitz, sigma_target, verbose=True
-    )
-    leverage_limit_result.save(f"checkpoints/leverage_limit_{annualized_target}.pickle")
+    logger.info("Running leverage limit Markowitz")
+    leverage_limit_result = run_backtest(leverage_limit_markowitz, sigma_target, verbose=True)
+    leverage_limit_result.save(checkpoints_path() / f"leverage_limit_{annualized_target}.pickle")
 
-    print("Running turnover limit Markowitz")
-    turnover_limit_result = run_backtest(
-        turnover_limit_markowitz, sigma_target, verbose=True
-    )
-    turnover_limit_result.save(f"checkpoints/turnover_limit_{annualized_target}.pickle")
+    logger.info("Running turnover limit Markowitz")
+    turnover_limit_result = run_backtest(turnover_limit_markowitz, sigma_target, verbose=True)
+    turnover_limit_result.save(checkpoints_path() / f"turnover_limit_{annualized_target}.pickle")
 
-    print("Running robust Markowitz")
+    logger.info("Running robust Markowitz")
     robust_result = run_backtest(robust_markowitz, sigma_target, verbose=True)
-    robust_result.save(f"checkpoints/robust_{annualized_target}.pickle")
+    robust_result.save(checkpoints_path() / f"robust_{annualized_target}.pickle")
 
 
 def generate_table(
@@ -294,24 +284,30 @@ def generate_per_year_tables(
     )
 
 
-def create_dataframe(subsets, years, attr, names, formatter):
+def create_dataframe(
+    subsets: list[list[BacktestResult]],
+    years: list[int],
+    attr: str,
+    names: list[str],
+    formatter: callable,
+) -> None:
     series_list = [
         pd.Series([getattr(result, attr) for result in subset], index=years, name=name)
         for subset, name in zip(subsets, names)
     ]
     df = pd.concat(series_list, axis=1)
-    print(df.applymap(formatter).to_latex())
+    print(df.map(formatter).to_latex())
 
 
 def process_dataframes(
-    equal_subs,
-    basic_subs,
-    weight_limited_subs,
-    leverage_limit_subs,
-    turnover_limit_subs,
-    robust_subs,
-    years,
-):
+    equal_subs: list[BacktestResult],
+    basic_subs: list[BacktestResult],
+    weight_limited_subs: list[BacktestResult],
+    leverage_limit_subs: list[BacktestResult],
+    turnover_limit_subs: list[BacktestResult],
+    robust_subs: list[BacktestResult],
+    years: list[int],
+) -> None:
     subsets = [
         equal_subs,
         basic_subs,
@@ -330,14 +326,10 @@ def process_dataframes(
     ]
 
     # Mean
-    create_dataframe(
-        subsets, years, "mean_return", names, formatter=lambda x: rf"{100 * x:.1f}\%"
-    )
+    create_dataframe(subsets, years, "mean_return", names, formatter=lambda x: rf"{100 * x:.1f}\%")
 
     # Volatility
-    create_dataframe(
-        subsets, years, "volatility", names, formatter=lambda x: rf"{100 * x:.1f}\%"
-    )
+    create_dataframe(subsets, years, "volatility", names, formatter=lambda x: rf"{100 * x:.1f}\%")
 
     # Sharpe Ratio
     create_dataframe(subsets, years, "sharpe", names, formatter=lambda x: f"{x:.2f}")
@@ -346,9 +338,7 @@ def process_dataframes(
     create_dataframe(subsets, years, "turnover", names, formatter=lambda x: f"{x:.1f}")
 
     # Leverage
-    create_dataframe(
-        subsets, years, "max_leverage", names, formatter=lambda x: f"{x:.1f}"
-    )
+    create_dataframe(subsets, years, "max_leverage", names, formatter=lambda x: f"{x:.1f}")
 
     # Drawdown
     create_dataframe(
