@@ -1,44 +1,36 @@
 import os
 
-import loguru
 import cvxpy as cp
 import numpy as np
 import pandas as pd
 
-from utils import generate_random_inputs
+from utils import generate_random_inputs, get_solver
 
 
-def main(logger=None):
-    logger = logger or loguru.logger
-    fitting = False
-
+def main(fitting: bool = False) -> None:
     scenarios = get_scenarios(fitting=fitting)
     res = []
     for n_assets, n_factors in scenarios:
         print(f"Running scenario with {n_assets} assets and {n_factors} factors")
-        solvers = [cp.MOSEK] if fitting else [cp.CLARABEL, cp.MOSEK]
-        solvers = [s for s in solvers if s in cp.installed_solvers()]
-        for solver in solvers:
-            n_iters = 1 if os.environ.get("CI") else 30
-            for _ in range(n_iters):
-                problem = run_scaling(n_assets, n_factors, solver)
-                assert problem.status in {
-                    cp.OPTIMAL,
-                    cp.OPTIMAL_INACCURATE,
-                }, problem.status
+        n_iters = 1 if os.environ.get("CI") else 30
+        for _ in range(n_iters):
+            problem = run_scaling(n_assets, n_factors)
+            assert problem.status in {
+                cp.OPTIMAL,
+                cp.OPTIMAL_INACCURATE,
+            }, problem.status
 
-                res.append(
-                    {
-                        "n_assets": n_assets,
-                        "n_factors": n_factors,
-                        "solve_time": problem.solver_stats.solve_time,
-                        "solver": solver,
-                    }
-                )
+            res.append(
+                {
+                    "n_assets": n_assets,
+                    "n_factors": n_factors,
+                    "solve_time": problem.solver_stats.solve_time,
+                }
+            )
 
     df = pd.DataFrame(res)
 
-    df = df.groupby(["n_assets", "n_factors", "solver"]).mean().reset_index()
+    df = df.groupby(["n_assets", "n_factors"]).mean().reset_index()
 
     if fitting:
         # Estimate the scaling exponents as solve time \approx a * n_assets^b * n_factors^c
@@ -66,9 +58,7 @@ def main(logger=None):
 
     else:
         df.set_index(["n_assets", "n_factors"], inplace=True)
-        df = df.pivot(columns="solver", values="solve_time")
         df = df.map(lambda x: f"{x:.2f}")
-        df = df.loc[:, solvers]
 
         # Reset column and row indices
         df.reset_index(inplace=True)
@@ -78,9 +68,7 @@ def main(logger=None):
         print(df.to_latex(index=False))
 
 
-def run_scaling(
-    n_assets: int, n_factors: int, solver: str
-) -> tuple[np.ndarray, float, cp.Problem]:
+def run_scaling(n_assets: int, n_factors: int) -> tuple[np.ndarray, float, cp.Problem]:
     mean, F, covariance = generate_random_inputs(n_assets, n_factors)
     factor_chol = np.linalg.cholesky(covariance)
     factor_volas = np.diag(factor_chol)
@@ -96,7 +84,7 @@ def run_scaling(
     rho_mean = np.percentile(np.abs(mean), 20, axis=0) * np.ones(n_assets)
     rho_covariance = 0.02
     L_max = 1.6
-    T_max = 50 / 252
+    T_max = 50 / 252 / 2
 
     risk_free = 0.0001
     w_lower = np.ones(n_assets) * (-0.05)
@@ -111,7 +99,7 @@ def run_scaling(
     w, c = cp.Variable(n_assets), cp.Variable()
 
     z = w - w_prev
-    T = cp.norm1(z)
+    T = cp.norm1(z) / 2
     L = cp.norm1(w)
 
     # worst-case (robust) return
@@ -140,7 +128,7 @@ def run_scaling(
     ]
 
     problem = cp.Problem(cp.Maximize(objective), constraints)
-    problem.solve(solver=solver, verbose=False)
+    problem.solve(solver=get_solver(), verbose=False)
 
     assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
     return problem
@@ -150,19 +138,19 @@ def get_scenarios(fitting=False):
     if not fitting:
         return [
             (100, 10),
-            (500, 30),
+            (500, 20),
             (500, 50),
-            (2000, 50),
-            (2000, 100),
-            (10000, 50),
-            (10000, 100),
+            (2_000, 50),
+            (2_000, 100),
+            (10_000, 50),
+            (10_000, 100),
             (50_000, 200),
             (50_000, 500),
         ]
     else:
         # fine grid for fitting
-        assets = np.logspace(3, 4.7, 10, dtype=int)
-        factors = np.logspace(3, 4, 10, dtype=int)
+        assets = np.logspace(3, 3.5, 10, dtype=int)
+        factors = np.logspace(3, 3.5, 10, dtype=int)
         pairs = [(a, f) for a in assets for f in factors if a >= f]
         return pairs
 

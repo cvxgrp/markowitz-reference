@@ -1,7 +1,7 @@
-import loguru
 import numpy as np
 import pandas as pd
 import cvxpy as cp
+from loguru import logger
 
 from backtest import BacktestResult, OptimizationInput, run_backtest
 from markowitz import Data, Parameters, markowitz
@@ -64,7 +64,7 @@ def turnover_limit_markowitz(
 ) -> tuple[np.ndarray, float, cp.Problem]:
     data, param = get_basic_data_and_parameters(inputs)
 
-    param.T_tar = 50 / 252  # Maximum TO per year
+    param.T_tar = 50 / 252 / 2  # Maximum TO per year
     return markowitz(data, param)
 
 
@@ -118,9 +118,7 @@ def get_basic_data_and_parameters(
     return data, param
 
 
-def main(from_checkpoint: bool = False, logger=None) -> None:
-    logger = logger or loguru.logger
-
+def main(from_checkpoint: bool = False) -> None:
     annualized_target = 0.10
 
     if not from_checkpoint:
@@ -169,9 +167,7 @@ def main(from_checkpoint: bool = False, logger=None) -> None:
     )
 
 
-def run_all_strategies(annualized_target: float, logger=None) -> None:
-    logger = logger or loguru.logger
-
+def run_all_strategies(annualized_target: float) -> None:
     equal_weights_results = run_backtest(equal_weights, 0.0, verbose=True)
     equal_weights_results.save(checkpoints_path() / "equal_weights.pickle")
 

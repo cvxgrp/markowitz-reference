@@ -9,19 +9,19 @@ import pandas as pd
 __folder = Path(__file__).parent
 
 
-def checkpoints_path():
+def checkpoints_path() -> Path:
     return __folder.parent / "checkpoints"
 
 
-def figures_path():
+def figures_path() -> Path:
     return __folder.parent / "figures"
 
 
-def data_path():
+def data_path() -> Path:
     return __folder.parent / "data"
 
 
-def experiment_path():
+def experiment_path() -> Path:
     return __folder.parent / "experiments"
 
 
@@ -67,7 +67,7 @@ def generate_random_inputs(
     return mean, loadings, covariance
 
 
-def get_solver():
+def get_solver() -> str:
     if os.getenv("CI"):
         return cp.CLARABEL
 

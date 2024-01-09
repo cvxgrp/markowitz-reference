@@ -1,7 +1,7 @@
 from functools import lru_cache
 import time
 
-import loguru
+from loguru import logger
 from matplotlib import pyplot as plt
 import cvxpy as cp
 import numpy as np
@@ -14,68 +14,6 @@ from experiments.backtest import (
     run_backtest,
 )
 from experiments.utils import get_solver, checkpoints_path, figures_path
-
-
-def scaling_markowitz(
-    inputs: OptimizationInput,
-) -> tuple[np.ndarray, float, cp.Problem]:
-    n_assets = inputs.n_assets
-    latest_prices = inputs.prices.iloc[-1]
-    portfolio_value = inputs.cash + inputs.quantities @ latest_prices
-
-    # The risk constraint is soft.
-    # For each percentage point of risk, we need to compensate with
-    # 5 percentage points of return.
-
-    rho_mean = np.percentile(np.abs(inputs.mean.values), 20, axis=0) * np.ones(
-        inputs.n_assets
-    )
-    rho_covariance = 0.02
-    L_max = 1.6
-    T_max = 50 / 252
-
-    w_lower = np.ones(inputs.n_assets) * (-0.05)
-    w_upper = np.ones(inputs.n_assets) * 0.1
-    c_lower = -0.05
-    c_upper = 1.0
-    gamma_risk = 5.0
-
-    w_prev = (inputs.quantities * latest_prices / portfolio_value).values
-    c_prev = inputs.cash / portfolio_value
-
-    w, c = cp.Variable(n_assets), cp.Variable()
-
-    z = w - w_prev
-    T = cp.norm1(z)
-    L = cp.norm1(w)
-
-    # worst-case (robust) return
-    mean_return = w @ inputs.mean.values + inputs.risk_free * c
-    return_uncertainty = rho_mean @ cp.abs(w)
-    return_wc = mean_return - return_uncertainty
-
-    # worst-case (robust) risk
-    risk = cp.norm2(inputs.chol.T @ w)
-    risk_uncertainty = rho_covariance**0.5 * inputs.volas @ cp.abs(w)
-    risk_wc = cp.norm2(cp.hstack([risk, risk_uncertainty]))
-
-    objective = return_wc - gamma_risk * cp.pos(risk_wc - inputs.risk_target)
-
-    constraints = [
-        cp.sum(w) + c == 1,
-        c == c_prev - cp.sum(z),
-        c_lower <= c,
-        c <= c_upper,
-        w_lower <= w,
-        w <= w_upper,
-        L <= L_max,
-        T <= T_max,
-    ]
-
-    problem = cp.Problem(cp.Maximize(objective), constraints)
-    problem.solve(solver=get_solver())
-    assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
-    return w.value, c.value, problem
 
 
 def parameter_scaling_markowitz(
@@ -110,7 +48,7 @@ def get_parametrized_problem(
 ) -> tuple[cp.Problem, dict, cp.Variable, cp.Variable]:
     rho_covariance = 0.02
     L_max = 1.6
-    T_max = 50 / 252
+    T_max = 50 / 252 / 2
 
     w_lower = np.ones(n_assets) * (-0.05)
     w_upper = np.ones(n_assets) * 0.1
@@ -129,7 +67,7 @@ def get_parametrized_problem(
     w, c = cp.Variable(n_assets), cp.Variable()
 
     z = w - w_prev
-    T = cp.norm1(z)
+    T = cp.norm1(z) / 2
     L = cp.norm1(w)
 
     # worst-case (robust) return
@@ -171,10 +109,8 @@ def get_parametrized_problem(
     return problem, param_dict, w, c
 
 
-def plot_timings(timings: list[Timing], specifier: str = "") -> None:
-    # Stacked area plot of cvxpy, solver, and other times
+def plot_timings(timings: list[Timing]) -> None:
     colors = ["#1f77b4", "#ff7f0e", "#2ca02c"]
-    # darker than darkgrey
     line_color = "#888888"
     plt.figure()
     plt.stackplot(
@@ -214,35 +150,35 @@ def plot_timings(timings: list[Timing], specifier: str = "") -> None:
 
     plt.ylabel("Time (s)")
     plt.legend()
-    plt.savefig(figures_path() / f"timing{specifier}.pdf")
+    plt.savefig(figures_path() / "timing_parametrized.pdf")
     plt.show()
 
 
-def main(from_checkpoint: bool = False, logger=None) -> None:
-    logger = logger or loguru.logger
+def initialize_problem(n_assets: int, sigma_target: float) -> None:
+    start = time.perf_counter()
+    problem, param_dict, _, _ = get_parametrized_problem(n_assets, sigma_target)
+
+    try:
+        for p in param_dict.values():
+            p.value = np.zeros(p.shape)
+        problem.solve(solver=get_solver())
+    except cp.SolverError:
+        pass
+
+    end = time.perf_counter()
+    logger.info(f"First call to get_parametrized_problem took {end-start} seconds")
+
+
+def main(from_checkpoint: bool = False) -> None:
     annualized_target = 0.10
     sigma_target = annualized_target / np.sqrt(252)
 
     if not from_checkpoint:
-        # logger.info("Running scaling")
-        # scaling_markowitz_result = run_backtest(scaling_markowitz, sigma_target, verbose=True)
-        # scaling_markowitz_result.save(f"checkpoints/scaling_{annualized_target}.pickle")
-
         logger.info("Running parameter scaling")
 
         n_assets = load_data()[0].shape[1]
-        start = time.perf_counter()
-        problem, param_dict, _, _ = get_parametrized_problem(n_assets, sigma_target)
 
-        try:
-            for p in param_dict.values():
-                p.value = np.zeros(p.shape)
-            problem.solve(solver=get_solver(), verbose=True)
-        except cp.SolverError:
-            pass
-
-        end = time.perf_counter()
-        logger.info(f"First call to get_parametrized_problem took {end-start} seconds")
+        initialize_problem(n_assets, sigma_target)
 
         scaling_parametrized_markowitz_result = run_backtest(
             parameter_scaling_markowitz, sigma_target, verbose=True
@@ -251,14 +187,10 @@ def main(from_checkpoint: bool = False, logger=None) -> None:
             checkpoints_path() / f"scaling_parametrized_{annualized_target}.pickle"
         )
     else:
-        # scaling_markowitz_result = BacktestResult.load(
-        #     f"checkpoints/scaling_{annualized_target}.pickle"
-        # )
         scaling_parametrized_markowitz_result = BacktestResult.load(
             checkpoints_path() / f"scaling_parametrized_{annualized_target}.pickle"
         )
 
-    # plot_timings(scaling_markowitz_result.timings)
     total_time = sum(t.total for t in scaling_parametrized_markowitz_result.timings)
     cvxpy_time = sum(t.cvxpy for t in scaling_parametrized_markowitz_result.timings)
     solver_time = sum(t.solver for t in scaling_parametrized_markowitz_result.timings)
@@ -274,7 +206,7 @@ def main(from_checkpoint: bool = False, logger=None) -> None:
     logger.info(f"CVXPY time {cvxpy_time/total_time}")
     logger.info(f"Solver time {solver_time/total_time}")
     logger.info(f"Other time {other_time/total_time}")
-    plot_timings(scaling_parametrized_markowitz_result.timings, "_parametrized")
+    plot_timings(scaling_parametrized_markowitz_result.timings)
 
 
 if __name__ == "__main__":
