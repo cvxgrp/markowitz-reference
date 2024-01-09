@@ -1,18 +1,16 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-
-from utils import experiment_path
 from backtest import load_data
 from tuning_utils import (
-    tune_in_parallel,
     HyperParameters,
     Targets,
-    run_soft_backtest,
     full_markowitz,
+    run_soft_backtest,
+    tune_in_parallel,
     yearly_data,
 )
-
+from utils import experiment_path
 
 if __name__ == "__main__":
     # SEE IF tuning_results/parameters.csv exists

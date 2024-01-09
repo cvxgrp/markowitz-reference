@@ -1,10 +1,11 @@
 import numpy as np
+from loguru import logger
 
 from experiments.tuning_utils import (
-    run_soft_backtest,
     HyperParameters,
     Targets,
     full_markowitz,
+    run_soft_backtest,
 )
 
 targets = Targets(
@@ -29,9 +30,9 @@ if __name__ == "__main__":
         verbose=True,
     )
 
-    print(f"mean: {results_soft.mean_return:.1%}")
-    print(f"volatility: {results_soft.volatility:.1%}")
-    print(f"max drawdown: {results_soft.max_drawdown:.1%}")
-    print(f"max leverage: {results_soft.max_leverage:.2f}")
-    print(f"sharpe: {results_soft.sharpe:.2f}")
-    print(f"turnover: {results_soft.turnover:.2f}")
+    logger.info(f"mean: {results_soft.mean_return:.1%}")
+    logger.info(f"volatility: {results_soft.volatility:.1%}")
+    logger.info(f"max drawdown: {results_soft.max_drawdown:.1%}")
+    logger.info(f"max leverage: {results_soft.max_leverage:.2f}")
+    logger.info(f"sharpe: {results_soft.sharpe:.2f}")
+    logger.info(f"turnover: {results_soft.turnover:.2f}")

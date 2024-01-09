@@ -3,7 +3,7 @@ import os
 import cvxpy as cp
 import numpy as np
 import pandas as pd
-
+from loguru import logger
 from utils import generate_random_inputs, get_solver
 
 
@@ -11,7 +11,7 @@ def main(fitting: bool = False) -> None:
     scenarios = get_scenarios(fitting=fitting)
     res = []
     for n_assets, n_factors in scenarios:
-        print(f"Running scenario with {n_assets} assets and {n_factors} factors")
+        logger.info(f"Running scenario with {n_assets} assets and {n_factors} factors")
         n_iters = 1 if os.environ.get("CI") else 30
         for _ in range(n_iters):
             problem = run_scaling(n_assets, n_factors)
@@ -43,15 +43,13 @@ def main(fitting: bool = False) -> None:
         c = cp.Variable()
 
         objective = cp.Minimize(
-            cp.sum_squares(
-                a + b * np.log(n_assets) + c * np.log(n_factors) - log_solve_time
-            )
+            cp.sum_squares(a + b * np.log(n_assets) + c * np.log(n_factors) - log_solve_time)
         )
         problem = cp.Problem(objective)
         problem.solve()
         assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}, problem.status
 
-        print(
+        logger.info(
             f"Estimated scaling exponents: a={np.exp(a.value):.2f}, \
             b={b.value:.2f}, c={c.value:.2f}"
         )
@@ -65,7 +63,7 @@ def main(fitting: bool = False) -> None:
         df.columns.name = None
         df.index.name = None
 
-        print(df.to_latex(index=False))
+        logger.info(df.to_latex(index=False))
 
 
 def run_scaling(n_assets: int, n_factors: int) -> tuple[np.ndarray, float, cp.Problem]:
@@ -134,7 +132,7 @@ def run_scaling(n_assets: int, n_factors: int) -> tuple[np.ndarray, float, cp.Pr
     return problem
 
 
-def get_scenarios(fitting=False):
+def get_scenarios(fitting: bool = False) -> list[tuple[int, int]]:
     if not fitting:
         return [
             (100, 10),

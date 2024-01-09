@@ -1,15 +1,16 @@
 import numpy as np
+from loguru import logger
 
 from experiments.backtest import load_data
 from experiments.tuning_utils import (
-    solve_hard_markowitz,
-    run_hard_backtest,
     HyperParameters,
     Targets,
+    run_hard_backtest,
+    solve_hard_markowitz,
 )
 
 
-if __name__ == "__main__":
+def main() -> None:
     prices, spread, rf, volume = load_data()
     training_length = 1250
     burn_in = 500  # first 500 for covariance
@@ -45,6 +46,10 @@ if __name__ == "__main__":
     gamma_turn = results.dual_optimals.Turnover.quantile(0.7)
     gamma_lev = 0.25 * results.dual_optimals.Leverage.quantile(1)
 
-    print(f"\ngamma_risk: {gamma_risk}")
-    print(f"gamma_turn: {gamma_turn}")
-    print(f"gamma_lev: {gamma_lev}")
+    logger.info(f"\ngamma_risk: {gamma_risk}")
+    logger.info(f"gamma_turn: {gamma_turn}")
+    logger.info(f"gamma_lev: {gamma_lev}")
+
+
+if __name__ == "__main__":
+    main()

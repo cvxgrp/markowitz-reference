@@ -1,13 +1,20 @@
-import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-
-from utils import experiment_path
-from tuning_utils import yearly_data, full_markowitz, tune_parameters
+import pandas as pd
 from backtest import load_data
+from tuning_utils import (
+    full_markowitz,
+    leverages,
+    risks,
+    sharpes,
+    tune_parameters,
+    turnovers,
+    yearly_data,
+)
+from utils import experiment_path
 
 
-if __name__ == "__main__":
+def main() -> None:
     ### see if tuning_results is in results folder ###
     try:
         tuning_results = pd.read_csv(
@@ -30,7 +37,7 @@ if __name__ == "__main__":
 
     except FileNotFoundError:
         prices, spread, rf, volume = load_data()
-        all_prices, all_spreads, all_volumes, all_rfs = yearly_data()
+        all_prices, _, _, _ = yearly_data()
 
         prices_train = all_prices[15]
         time_last = prices_train.index[-1]
@@ -42,7 +49,7 @@ if __name__ == "__main__":
         volume_train_test = volume.loc[prices_train_test.index]
         rf_train_test = rf.loc[prices_train_test.index]
 
-        parameter_dict, best_backtest = tune_parameters(
+        parameter_dict, _ = tune_parameters(
             full_markowitz,
             prices_train_test,
             spread_train_test,
@@ -71,67 +78,11 @@ if __name__ == "__main__":
         train_len = 500
         test_len = len(prices_train_test) - 500 - train_len
 
-        def sharpes(results):
-            returns_train = results.portfolio_returns.iloc[:-test_len]
-            returns_test = results.portfolio_returns.iloc[-test_len:]
-            sharpe_train = (
-                np.sqrt(results.periods_per_year)
-                * returns_train.mean()
-                / returns_train.std()
-            )
-            sharpe_test = (
-                np.sqrt(results.periods_per_year)
-                * returns_test.mean()
-                / returns_test.std()
-            )
-
-            return sharpe_train, sharpe_test
-
-        def volas(results):
-            vola_train = (
-                np.sqrt(results.periods_per_year)
-                * results.portfolio_returns.iloc[:-test_len].std()
-            )
-            vola_test = (
-                np.sqrt(results.periods_per_year)
-                * results.portfolio_returns.iloc[-test_len:].std()
-            )
-
-            return vola_train, vola_test
-
-        def leverages(results):
-            leverage_train = (
-                results.asset_weights.abs().iloc[:-test_len].sum(axis=1).max()
-            )
-            leverage_test = (
-                results.asset_weights.abs().iloc[-test_len:].sum(axis=1).max()
-            )
-
-            return leverage_train, leverage_test
-
-        def turnovers(results):
-            trades = results.quantities.diff()
-            valuation_trades = (trades * prices).dropna()
-            relative_trades = valuation_trades.div(results.portfolio_value, axis=0)
-
-            turnover_train = (
-                relative_trades.abs().sum(axis=1).iloc[:-test_len].mean()
-                * results.periods_per_year
-                / 2
-            )
-            turnover_test = (
-                relative_trades.abs().sum(axis=1).iloc[-test_len:].mean()
-                * results.periods_per_year
-                / 2
-            )
-
-            return turnover_train, turnover_test
-
         for i in parameter_dict.keys():
-            sharpe_train, sharpe_test = sharpes(parameter_dict[i][-1])
-            vola_train, vola_test = volas(parameter_dict[i][-1])
-            leverage_train, leverage_test = leverages(parameter_dict[i][-1])
-            turnover_train, turnover_test = turnovers(parameter_dict[i][-1])
+            sharpe_train, sharpe_test = sharpes(parameter_dict[i][-1], test_len)
+            vola_train, vola_test = risks(parameter_dict[i][-1], test_len)
+            leverage_train, leverage_test = leverages(parameter_dict[i][-1], test_len)
+            turnover_train, turnover_test = turnovers(parameter_dict[i][-1], prices, test_len)
 
             sharpe_ratios_train.append(sharpe_train)
             sharpe_ratios_test.append(sharpe_test)
@@ -186,6 +137,31 @@ if __name__ == "__main__":
         df.turn_test = turnovers_test
         df.to_csv(experiment_path() / "tuning_results/tuning_results.csv")
 
+    ### PLOT RESULTS ###
+    plot_results(
+        backtests,
+        sharpe_ratios_train,
+        sharpe_ratios_test,
+        volas_train,
+        volas_test,
+        leverages_train,
+        leverages_test,
+        turnovers_train,
+        turnovers_test,
+    )
+
+
+def plot_results(
+    backtests: np.ndarray,
+    sharpe_ratios_train: np.ndarray,
+    sharpe_ratios_test: np.ndarray,
+    volas_train: np.ndarray,
+    volas_test: np.ndarray,
+    leverages_train: np.ndarray,
+    leverages_test: np.ndarray,
+    turnovers_train: np.ndarray,
+    turnovers_test: np.ndarray,
+) -> None:
     # sharpe
     plt.plot(backtests, sharpe_ratios_train, label="in-sample", marker="o")
     plt.plot(backtests, sharpe_ratios_test, label="out-of-sample", marker="o")
@@ -206,9 +182,7 @@ if __name__ == "__main__":
     plt.xticks(backtests)
     plt.gca().xaxis.set_major_locator(plt.MultipleLocator(5))
     plt.ylim(0.0, 0.12)
-    plt.savefig(
-        experiment_path() / "tuning_results/tuning_vola.pdf", bbox_inches="tight"
-    )
+    plt.savefig(experiment_path() / "tuning_results/tuning_vola.pdf", bbox_inches="tight")
     plt.show()
 
     # leverage
@@ -219,9 +193,7 @@ if __name__ == "__main__":
     plt.xticks(backtests)
     plt.gca().xaxis.set_major_locator(plt.MultipleLocator(5))
     plt.ylim(1, 2)
-    plt.savefig(
-        experiment_path() / "tuning_results/tuning_lev.pdf", bbox_inches="tight"
-    )
+    plt.savefig(experiment_path() / "tuning_results/tuning_lev.pdf", bbox_inches="tight")
     plt.show()
 
     # turnover
@@ -232,7 +204,9 @@ if __name__ == "__main__":
     plt.xticks(backtests)
     plt.gca().xaxis.set_major_locator(plt.MultipleLocator(5))
     plt.ylim(20, 50)
-    plt.savefig(
-        experiment_path() / "tuning_results/tuning_turn.pdf", bbox_inches="tight"
-    )
+    plt.savefig(experiment_path() / "tuning_results/tuning_turn.pdf", bbox_inches="tight")
     plt.show()
+
+
+if __name__ == "__main__":
+    main()

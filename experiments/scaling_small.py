@@ -1,10 +1,10 @@
-from functools import lru_cache
 import time
+from functools import lru_cache
 
-from loguru import logger
-from matplotlib import pyplot as plt
 import cvxpy as cp
 import numpy as np
+from loguru import logger
+from matplotlib import pyplot as plt
 
 from experiments.backtest import (
     BacktestResult,
@@ -13,23 +13,21 @@ from experiments.backtest import (
     load_data,
     run_backtest,
 )
-from experiments.utils import get_solver, checkpoints_path, figures_path
+from experiments.utils import checkpoints_path, figures_path, get_solver
 
 
 def parameter_scaling_markowitz(
     inputs: OptimizationInput,
 ) -> tuple[np.ndarray, float, cp.Problem]:
-    problem, param_dict, w, c = get_parametrized_problem(
-        inputs.n_assets, inputs.risk_target
-    )
+    problem, param_dict, w, c = get_parametrized_problem(inputs.n_assets, inputs.risk_target)
     latest_prices = inputs.prices.iloc[-1]
     portfolio_value = inputs.cash + inputs.quantities @ latest_prices
 
     param_dict["chol"].value = inputs.chol
     param_dict["volas"].value = inputs.volas
-    param_dict["rho_mean"].value = np.percentile(
-        np.abs(inputs.mean.values), 20, axis=0
-    ) * np.ones(inputs.n_assets)
+    param_dict["rho_mean"].value = np.percentile(np.abs(inputs.mean.values), 20, axis=0) * np.ones(
+        inputs.n_assets
+    )
     param_dict["w_prev"].value = (
         inputs.quantities * inputs.prices.iloc[-1] / portfolio_value
     ).values
@@ -197,9 +195,7 @@ def main(from_checkpoint: bool = False) -> None:
     other_time = sum(t.other for t in scaling_parametrized_markowitz_result.timings)
     logger.info(f"Total time {total_time}")
     logger.info(len(scaling_parametrized_markowitz_result.timings))
-    logger.info(
-        f"Average time {total_time / len(scaling_parametrized_markowitz_result.timings)}"
-    )
+    logger.info(f"Average time {total_time / len(scaling_parametrized_markowitz_result.timings)}")
     logger.info(
         f"Average solver time {solver_time / len(scaling_parametrized_markowitz_result.timings)}"
     )

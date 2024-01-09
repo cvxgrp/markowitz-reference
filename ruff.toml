@@ -1,5 +1,6 @@
 line-length = 100
 
-#[lint]
+select = ["E", "F", "I", "UP", "B", "ANN", "N", "C4", "ERA"]
 
-ignore = ["E402"]
+#[lint]
+ignore = ["E402", "ANN101", "ANN102", "N806", "N803"]

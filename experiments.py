@@ -6,15 +6,12 @@ from loguru import logger
 
 sys.path.append((Path(__file__).parent / "experiments").as_posix())
 
-from experiments.taming import main as taming_main
-from experiments.scaling_small import main as scaling_small_main
 from experiments.scaling_large import main as scaling_large_main
-from experiments.utils import figures_path, checkpoints_path
-
+from experiments.scaling_small import main as scaling_small_main
+from experiments.taming import main as taming_main
+from experiments.utils import checkpoints_path, figures_path
 
 if __name__ == "__main__":
-    logger.info("Welcome to ...")
-
     logger.info("sys.path:")
     for path in sys.path:
         logger.debug(path)
@@ -24,10 +21,11 @@ if __name__ == "__main__":
     figures_path().mkdir(exist_ok=True)
 
     logger.debug("Run experiments")
-    scaling_small_main(logger=logger)
+    scaling_small_main()
 
     if not os.getenv("CI"):
-        # Large scale experiments require in particular a Mosek license
+        # Large scale experiments require a Mosek license
         # Hence we do not perform them on a GitHub CI server
-        scaling_large_main(logger=logger)
-        taming_main(logger=logger)
+        scaling_large_main(fitting=True)
+        scaling_large_main(fitting=False)
+        taming_main()

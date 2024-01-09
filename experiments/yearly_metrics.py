@@ -1,14 +1,13 @@
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
-
-from utils import experiment_path
+import numpy as np
+import pandas as pd
 from tuning_utils import (
     HyperParameters,
     Targets,
-    run_soft_backtest,
     full_markowitz,
+    run_soft_backtest,
 )
+from utils import experiment_path
 
 if __name__ == "__main__":
     try:
@@ -18,8 +17,8 @@ if __name__ == "__main__":
             parse_dates=True,
         )
         parameters_df.index = pd.to_datetime(parameters_df.index)
-    except FileNotFoundError:
-        raise FileNotFoundError("Run 'tuning_yearly_retune.py' first.")
+    except FileNotFoundError as exc:
+        raise FileNotFoundError("Run 'tuning_yearly_retune.py' first.") from exc
 
     hyperparameters = HyperParameters(
         gamma_hold=parameters_df.gamma_hold,
@@ -45,9 +44,7 @@ if __name__ == "__main__":
     ### Yearly metrics ###
     port_returns = results_fully_tuned.portfolio_returns
 
-    yearly_means_tuned = (
-        port_returns.resample("Y").mean() * results_fully_tuned.periods_per_year
-    )
+    yearly_means_tuned = port_returns.resample("Y").mean() * results_fully_tuned.periods_per_year
     yearly_volas_tuned = port_returns.resample("Y").std() * np.sqrt(
         results_fully_tuned.periods_per_year
     )
@@ -212,17 +209,12 @@ if __name__ == "__main__":
 
     # means
     yearly_means_tuned.plot(label="Tuned Markowitz++", marker="o")
-    # yearly_means_hard.plot(label="Hard Markowitz", marker="o")
     equal_means.plot(label="Equal weights", marker="o")
     basic_means.plot(label="Basic Markowitz", marker="o")
     plt.ylabel("Mean return")
-    plt.gca().yaxis.set_major_formatter(
-        plt.FuncFormatter(lambda x, loc: "{:,}%".format(int(x * 100)))
-    )
+    plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda x, loc: f"{int(x * 100):,}%"))
     plt.legend()
-    plt.savefig(
-        experiment_path() / "tuning_results/yearly_means.pdf", bbox_inches="tight"
-    )
+    plt.savefig(experiment_path() / "tuning_results/yearly_means.pdf", bbox_inches="tight")
     plt.show()
 
     # volas
@@ -230,12 +222,8 @@ if __name__ == "__main__":
     equal_volas.plot(label="Equal weights", marker="o")
     basic_volas.plot(label="Basic Markowitz", marker="o")
     plt.ylabel("Volatility")
-    plt.gca().yaxis.set_major_formatter(
-        plt.FuncFormatter(lambda x, loc: "{:,}%".format(int(x * 100)))
-    )
-    plt.savefig(
-        experiment_path() / "tuning_results/yearly_volas.pdf", bbox_inches="tight"
-    )
+    plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda x, loc: f"{int(x * 100):,}%"))
+    plt.savefig(experiment_path() / "tuning_results/yearly_volas.pdf", bbox_inches="tight")
     plt.show()
 
     # sharpes
@@ -243,11 +231,7 @@ if __name__ == "__main__":
     equal_sharpes.plot(label="Equal weights", marker="o")
     basic_sharpes.plot(label="Basic Markowitz", marker="o")
     plt.ylabel("Sharpe ratio")
-    plt.gca().yaxis.set_major_formatter(
-        plt.FuncFormatter(lambda x, loc: "{:,}".format(int(x)))
-    )
+    plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda x, loc: f"{int(x):,}"))
     plt.legend()
-    plt.savefig(
-        experiment_path() / "tuning_results/yearly_sharpes.pdf", bbox_inches="tight"
-    )
+    plt.savefig(experiment_path() / "tuning_results/yearly_sharpes.pdf", bbox_inches="tight")
     plt.show()

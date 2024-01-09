@@ -1,10 +1,9 @@
-from pathlib import Path
 import os
+from pathlib import Path
 
-import numpy as np
 import cvxpy as cp
+import numpy as np
 import pandas as pd
-
 
 __folder = Path(__file__).parent
 
@@ -76,15 +75,10 @@ def get_solver() -> str:
 
 if __name__ == "__main__":
     prices = pd.read_csv(data_path() / "prices.csv", index_col=0, parse_dates=True)
-    synthetic_returns = synthetic_returns(
-        prices, information_ratio=0.15, forward_smoothing=5
-    )
+    synthetic_returns = synthetic_returns(prices, information_ratio=0.15, forward_smoothing=5)
     returns = prices.pct_change()
     print(
-        (
-            np.sign(synthetic_returns - returns.mean())
-            == np.sign(returns - returns.mean())
-        )
+        (np.sign(synthetic_returns - returns.mean()) == np.sign(returns - returns.mean()))
         .mean(axis=0)
         .describe()
     )

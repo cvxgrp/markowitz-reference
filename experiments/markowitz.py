@@ -13,8 +13,8 @@
 #    limitations under the License.from dataclasses import dataclass
 from dataclasses import dataclass
 
-import numpy as np
 import cvxpy as cp
+import numpy as np
 
 
 @dataclass
@@ -37,9 +37,7 @@ class Data:
 
     @property
     def volas(self) -> np.ndarray:
-        return self.idio_volas + np.linalg.norm(
-            self.F @ self.factor_covariance_chol, axis=1
-        )
+        return self.idio_volas + np.linalg.norm(self.F @ self.factor_covariance_chol, axis=1)
 
 
 @dataclass
@@ -96,9 +94,7 @@ def markowitz(data: Data, param: Parameters) -> tuple[np.ndarray, float, cp.Prob
     impact_cost = data.kappa_impact @ cp.power(cp.abs(z), 3 / 2)
     trading_cost = spread_cost + impact_cost
 
-    objective = (
-        return_wc - param.gamma_hold * holding_cost - param.gamma_trade * trading_cost
-    )
+    objective = return_wc - param.gamma_hold * holding_cost - param.gamma_trade * trading_cost
 
     constraints = [
         cp.sum(w) + c == 1,
