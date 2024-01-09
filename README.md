@@ -13,5 +13,11 @@ Please run all experiments using
 make experiments
 ```
 
-Before the experiments start the virtual environment defined in 'requirements.txt'
-is replicated locally.
+This first replicates the virtual environment defined in 'requirements.txt'
+locally and then runs the experiments defined in 'experiments.py'.
+
+## Reproducibility
+
+The main packages used are specified in 'requirements.txt', with a frozen
+version of all packages and their sub-dependencies in 'requirements_frozen.txt'.
+We used Python 3.10.13 to run the experiments.
