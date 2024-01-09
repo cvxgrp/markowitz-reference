@@ -1,8 +1,10 @@
 from pathlib import Path
+import os
 
 import numpy as np
 import cvxpy as cp
 import pandas as pd
+
 
 __folder = Path(__file__).parent
 
@@ -19,12 +21,18 @@ def data_path():
     return __folder.parent / "data"
 
 
+def experiment_path():
+    return __folder.parent / "experiments"
+
+
 def synthetic_returns(
     prices: pd.DataFrame, information_ratio: float, forward_smoothing: int
 ) -> pd.DataFrame:
     """
     prices: a DataFrame of prices
     information_ratio: the desired information ratio of the synthetic returns
+    smoothing_len: the length of the smoothing window for the synthetic returns
+    seed: random seed for reproducibility
 
     returns: a DataFrame of "synthetic return predictions" computed as
     alpha*(returns+noise), where alpha=var_r / (var_r + var_eps); this is the
@@ -60,11 +68,14 @@ def generate_random_inputs(
 
 
 def get_solver():
+    if os.getenv("CI"):
+        return cp.CLARABEL
+
     return cp.MOSEK if cp.MOSEK in cp.installed_solvers() else cp.CLARABEL
 
 
 if __name__ == "__main__":
-    prices = pd.read_csv("data/prices.csv", index_col=0, parse_dates=True)
+    prices = pd.read_csv(data_path() / "prices.csv", index_col=0, parse_dates=True)
     synthetic_returns = synthetic_returns(
         prices, information_ratio=0.15, forward_smoothing=5
     )

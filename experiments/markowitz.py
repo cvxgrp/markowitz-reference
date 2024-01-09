@@ -58,6 +58,7 @@ class Parameters:
     gamma_trade: float  # trading cost
     gamma_turn: float  # turnover cost
     gamma_risk: float  # risk cost
+    gamma_leverage: float  # leverage cost
     risk_target: float  # risk target as volatility
 
 
@@ -152,6 +153,7 @@ if __name__ == "__main__":
         gamma_trade=0.0,
         gamma_turn=0.0,
         gamma_risk=0.0,
+        gamma_leverage=0.0,
         risk_target=0.0,
     )
 
