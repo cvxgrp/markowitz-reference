@@ -150,14 +150,16 @@ def main(from_checkpoint: bool = False) -> None:
         robust_result,
     )
 
-    generate_per_year_tables(
-        equal_weights_results,
-        basic_result,
-        weight_limited_result,
-        leverage_limit_result,
-        turnover_limit_result,
-        robust_result,
-    )
+    show_yearly_metrics = False
+    if show_yearly_metrics:
+        generate_per_year_tables(
+            equal_weights_results,
+            basic_result,
+            weight_limited_result,
+            leverage_limit_result,
+            turnover_limit_result,
+            robust_result,
+        )
 
 
 def run_all_strategies(annualized_target: float) -> None:

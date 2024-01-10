@@ -108,6 +108,7 @@ if __name__ == "__main__":
 
     ### PLOT RESULTS ###
     tuning_len = 1250
+    show_plot = False
     for param in parameters_df.columns:
         plt.figure()
         plt.plot(parameters_df[param].iloc[tuning_len:], label=param)
@@ -117,6 +118,5 @@ if __name__ == "__main__":
             experiment_path() / f"tuning_results/tuning_{param}.pdf",
             bbox_inches="tight",
         )
-        plt.show()
-
-        # save figure as pdf
+        if show_plot:
+            plt.show()

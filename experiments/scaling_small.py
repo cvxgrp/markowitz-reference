@@ -149,7 +149,10 @@ def plot_timings(timings: list[Timing]) -> None:
     plt.ylabel("Time (s)")
     plt.legend()
     plt.savefig(figures_path() / "timing_parametrized.pdf")
-    plt.show()
+
+    show_plot = False
+    if show_plot:
+        plt.show()
 
 
 def initialize_problem(n_assets: int, sigma_target: float) -> None:

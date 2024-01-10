@@ -162,6 +162,8 @@ def plot_results(
     turnovers_train: np.ndarray,
     turnovers_test: np.ndarray,
 ) -> None:
+    show_plot = False
+
     # sharpe
     plt.plot(backtests, sharpe_ratios_train, label="in-sample", marker="o")
     plt.plot(backtests, sharpe_ratios_test, label="out-of-sample", marker="o")
@@ -172,7 +174,8 @@ def plot_results(
     plt.legend()
     plt.ylim(3, 7)
     plt.savefig(experiment_path() / "tuning_results/tuning_SR.pdf", bbox_inches="tight")
-    plt.show()
+    if show_plot:
+        plt.show()
 
     # vola
     plt.plot(backtests, volas_train, label="train", marker="o")
@@ -183,7 +186,8 @@ def plot_results(
     plt.gca().xaxis.set_major_locator(plt.MultipleLocator(5))
     plt.ylim(0.0, 0.12)
     plt.savefig(experiment_path() / "tuning_results/tuning_vola.pdf", bbox_inches="tight")
-    plt.show()
+    if show_plot:
+        plt.show()
 
     # leverage
     plt.plot(backtests, leverages_train, label="train", marker="o")
@@ -194,7 +198,8 @@ def plot_results(
     plt.gca().xaxis.set_major_locator(plt.MultipleLocator(5))
     plt.ylim(1, 2)
     plt.savefig(experiment_path() / "tuning_results/tuning_lev.pdf", bbox_inches="tight")
-    plt.show()
+    if show_plot:
+        plt.show()
 
     # turnover
     plt.plot(backtests, turnovers_train, label="train", marker="o")
@@ -205,7 +210,8 @@ def plot_results(
     plt.gca().xaxis.set_major_locator(plt.MultipleLocator(5))
     plt.ylim(20, 50)
     plt.savefig(experiment_path() / "tuning_results/tuning_turn.pdf", bbox_inches="tight")
-    plt.show()
+    if show_plot:
+        plt.show()
 
 
 if __name__ == "__main__":
