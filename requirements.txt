@@ -4,3 +4,4 @@ pandas[output-formatting]==2.1.4
 matplotlib==3.8.2
 loguru==0.7.2
 mosek==10.1.21
+cvxsimulator==0.9.3
