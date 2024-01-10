@@ -28,4 +28,5 @@ if __name__ == "__main__":
         # Hence we do not perform them on a GitHub CI server
         scaling_large_main(fitting=True)
         scaling_large_main(fitting=False)
-        taming_main()
+
+    taming_main()
