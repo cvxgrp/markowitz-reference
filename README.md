@@ -23,11 +23,12 @@ version of all packages and their sub-dependencies in 'requirements_frozen.txt'.
 We used Python 3.10.13 to run the experiments.
 
 ## Citation
+
 If you want to reference our work in your research, please consider using the following BibTeX for the citation:
 
 ```BibTeX
 @misc{boyd2024markowitz,
-      title={Markowitz Portfolio Construction at Seventy}, 
+      title={Markowitz Portfolio Construction at Seventy},
       author={Stephen Boyd and Kasper Johansson and Ronald Kahn and Philipp Schiele and Thomas Schmelzer},
       year={2024},
       doi = {10.48550/arXiv.2401.05080},
