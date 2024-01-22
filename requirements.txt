@@ -1,6 +1,6 @@
 cvxpy==1.4.1
 numpy==1.26.3
-pandas[output-formatting]==2.1.4
+pandas[output-formatting]==2.2.0
 matplotlib==3.8.2
 loguru==0.7.2
 mosek==10.1.21
