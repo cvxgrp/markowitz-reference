@@ -8,6 +8,10 @@ install:  ## Install a virtual environment
 	${VENV}/bin/pip install --upgrade pip
 	${VENV}/bin/pip install -r requirements.txt
 
+.PHONY: freeze
+freeze: install  ## Freeze all requirements
+	${VENV}/bin/pip freeze > requirements_frozen.txt
+
 .PHONY: fmt
 fmt: install ## Run autoformatting and linting
 	${VENV}/bin/pip install pre-commit
