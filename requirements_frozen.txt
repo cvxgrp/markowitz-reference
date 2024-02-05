@@ -1,6 +1,6 @@
 clarabel==0.6.0
 contourpy==1.2.0
-cvxpy==1.4.1
+cvxpy==1.4.2
 cycler==0.12.1
 ecos==2.0.12
 fonttools==4.47.2
