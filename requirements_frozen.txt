@@ -13,7 +13,7 @@ Mosek==10.1.21
 numpy==1.26.3
 osqp==0.6.4
 packaging==23.2
-pandas==2.1.4
+pandas==2.2.0
 pillow==10.2.0
 pybind11==2.11.1
 pyparsing==3.1.1
