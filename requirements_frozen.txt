@@ -10,7 +10,7 @@ loguru==0.7.2
 MarkupSafe==2.1.5
 matplotlib==3.8.2
 Mosek==10.1.24
-numpy==1.26.3
+numpy==1.26.4
 osqp==0.6.5
 packaging==23.2
 pandas==2.2.0
