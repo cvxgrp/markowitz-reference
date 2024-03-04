@@ -1,4 +1,4 @@
-clarabel==0.6.0
+clarabel==0.7.1
 contourpy==1.2.0
 cvxpy==1.4.2
 cycler==0.12.1
