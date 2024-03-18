@@ -3,4 +3,4 @@ numpy==1.26.4
 pandas[output-formatting]==2.2.1
 matplotlib==3.8.3
 loguru==0.7.2
-mosek==10.1.27
+mosek==10.1.28
