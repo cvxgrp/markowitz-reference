@@ -627,7 +627,8 @@ def risks(results: BacktestResult, test_len: int) -> tuple[float, float]:
         risk_test = returns_test.std() * np.sqrt(results.periods_per_year)
         return risk_train, risk_test
 
-    raise ValueError("test_len must be 0 or positive")
+    else
+        raise ValueError("test_len must be 0 or positive")
 
 
 def accept_new_parameter(
