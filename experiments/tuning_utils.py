@@ -590,7 +590,7 @@ def turnovers(results: BacktestResult, prices: pd.DataFrame, test_len: int) -> t
         ) / 2
 
         return turnover_train, turnover_test
-    else
+    else:
         raise ValueError("test_len must be 0 or positive")
 
 
@@ -606,7 +606,7 @@ def leverages(results: BacktestResult, test_len: int) -> tuple[float, float]:
         leverage_train = results.asset_weights.abs().sum(axis=1).iloc[:-test_len].max()
         leverage_test = results.asset_weights.abs().sum(axis=1).iloc[-test_len:].max()
         return leverage_train, leverage_test
-    else
+    else:
         raise ValueError("test_len must be 0 or positive")
 
 
@@ -627,7 +627,7 @@ def risks(results: BacktestResult, test_len: int) -> tuple[float, float]:
         risk_test = returns_test.std() * np.sqrt(results.periods_per_year)
         return risk_train, risk_test
 
-    else
+    else:
         raise ValueError("test_len must be 0 or positive")
 
 
