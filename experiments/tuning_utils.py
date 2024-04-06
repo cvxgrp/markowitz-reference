@@ -590,8 +590,8 @@ def turnovers(results: BacktestResult, prices: pd.DataFrame, test_len: int) -> t
         ) / 2
 
         return turnover_train, turnover_test
-
-    raise ValueError("test_len must be 0 or positive")
+    else
+        raise ValueError("test_len must be 0 or positive")
 
 
 def leverages(results: BacktestResult, test_len: int) -> tuple[float, float]:
