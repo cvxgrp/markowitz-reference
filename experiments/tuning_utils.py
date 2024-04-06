@@ -403,7 +403,9 @@ def tune_parameters(
     param train_len: length of training period; if None, all data is used for tuning
     """
     train_len = train_len or len(prices)
-    test_len = len(prices) - 500 - train_len
+    test_len = max(
+        len(prices) - 500 - train_len, 0
+    )  # first 500 used to initialize EWMA covariance predictions
 
     # Strategy closure
     def run_strategy(targets: Targets, hyperparameters: HyperParameters) -> BacktestResult:
@@ -465,9 +467,9 @@ def tune_parameters(
 
         results = run_strategy(targets, hyperparameters_temp)
         backtest += 1
-        sharpe_train, sharpe_test = sharpes(results)
+        sharpe_train, sharpe_test = sharpes(results, test_len)
 
-        if accept_new_parameter(results, sharpe_train_old, verbose):
+        if accept_new_parameter(results, sharpe_train, sharpe_train_old, prices, test_len, verbose):
             # update hyperparameters
             hyperparameter_list = hyperparameter_list_temp.copy()
             hyperparameters = hyperparameters_temp
@@ -490,9 +492,11 @@ def tune_parameters(
 
             results = run_strategy(targets, hyperparameters_temp)
             backtest += 1
-            sharpe_train, sharpe_test = sharpes(results)
+            sharpe_train, sharpe_test = sharpes(results, test_len)
 
-            if accept_new_parameter(results, sharpe_train_old, verbose):
+            if accept_new_parameter(
+                results, sharpe_train, sharpe_train_old, prices, test_len, verbose
+            ):
                 # update hyperparameters
                 hyperparameter_list = hyperparameter_list_temp.copy()
                 hyperparameters = hyperparameters_temp
@@ -538,13 +542,25 @@ def sharpes(results: BacktestResult, test_len: int) -> tuple[float, float]:
     """
     returns sharpe ratio for training and test period
     """
-    returns_train = results.portfolio_returns.iloc[:-test_len]
-    returns_test = results.portfolio_returns.iloc[-test_len:]
+    if test_len == 0:
+        returns_train = results.portfolio_returns
+        sharpe_train = (
+            np.sqrt(results.periods_per_year) * returns_train.mean() / returns_train.std()
+        )
+        return sharpe_train, None
 
-    sharpe_train = np.sqrt(results.periods_per_year) * returns_train.mean() / returns_train.std()
-    sharpe_test = np.sqrt(results.periods_per_year) * returns_test.mean() / returns_test.std()
+    elif test_len > 0:
+        returns_train = results.portfolio_returns.iloc[:-test_len]
+        returns_test = results.portfolio_returns.iloc[-test_len:]
 
-    return sharpe_train, sharpe_test
+        sharpe_train = (
+            np.sqrt(results.periods_per_year) * returns_train.mean() / returns_train.std()
+        )
+        sharpe_test = np.sqrt(results.periods_per_year) * returns_test.mean() / returns_test.std()
+
+        return sharpe_train, sharpe_test
+
+    raise ValueError("test_len must be 0 or positive")
 
 
 def turnovers(results: BacktestResult, prices: pd.DataFrame, test_len: int) -> tuple[float, float]:
@@ -554,33 +570,65 @@ def turnovers(results: BacktestResult, prices: pd.DataFrame, test_len: int) -> t
     trades = results.quantities.diff()
     valuation_trades = (trades * prices).dropna()
     relative_trades = valuation_trades.div(results.portfolio_value, axis=0)
-    relative_trades_train = relative_trades.iloc[:-test_len]
-    relative_trades_test = relative_trades.iloc[-test_len:]
 
-    turnover_train = (relative_trades_train.abs().sum(axis=1).mean() * results.periods_per_year) / 2
-    turnover_test = (relative_trades_test.abs().sum(axis=1).mean() * results.periods_per_year) / 2
+    if test_len == 0:
+        relative_trades_train = relative_trades
+        turnover_train = (
+            relative_trades_train.abs().sum(axis=1).mean() * results.periods_per_year
+        ) / 2
+        return turnover_train, None
 
-    return turnover_train, turnover_test
+    elif test_len > 0:
+        relative_trades_train = relative_trades.iloc[:-test_len]
+        relative_trades_test = relative_trades.iloc[-test_len:]
+
+        turnover_train = (
+            relative_trades_train.abs().sum(axis=1).mean() * results.periods_per_year
+        ) / 2
+        turnover_test = (
+            relative_trades_test.abs().sum(axis=1).mean() * results.periods_per_year
+        ) / 2
+
+        return turnover_train, turnover_test
+    else:
+        raise ValueError("test_len must be 0 or positive")
 
 
 def leverages(results: BacktestResult, test_len: int) -> tuple[float, float]:
     """
     returns leverage for training and test period
     """
-    leverage_train = results.asset_weights.abs().sum(axis=1).iloc[:-test_len].max()
-    leverage_test = results.asset_weights.abs().sum(axis=1).iloc[-test_len:].max()
-    return leverage_train, leverage_test
+    if test_len == 0:
+        leverage_train = results.asset_weights.abs().sum(axis=1).max()
+        return leverage_train, None
+
+    elif test_len > 0:
+        leverage_train = results.asset_weights.abs().sum(axis=1).iloc[:-test_len].max()
+        leverage_test = results.asset_weights.abs().sum(axis=1).iloc[-test_len:].max()
+        return leverage_train, leverage_test
+    else:
+        raise ValueError("test_len must be 0 or positive")
 
 
 def risks(results: BacktestResult, test_len: int) -> tuple[float, float]:
     """
     returns risk for training and test period
     """
-    returns_train = results.portfolio_returns.iloc[:-test_len]
-    returns_test = results.portfolio_returns.iloc[-test_len:]
-    risk_train = returns_train.std() * np.sqrt(results.periods_per_year)
-    risk_test = returns_test.std() * np.sqrt(results.periods_per_year)
-    return risk_train, risk_test
+
+    if test_len == 0:
+        returns_train = results.portfolio_returns
+        risk_train = returns_train.std() * np.sqrt(results.periods_per_year)
+        return risk_train, None
+
+    elif test_len > 0:
+        returns_train = results.portfolio_returns.iloc[:-test_len]
+        returns_test = results.portfolio_returns.iloc[-test_len:]
+        risk_train = returns_train.std() * np.sqrt(results.periods_per_year)
+        risk_test = returns_test.std() * np.sqrt(results.periods_per_year)
+        return risk_train, risk_test
+
+    else:
+        raise ValueError("test_len must be 0 or positive")
 
 
 def accept_new_parameter(

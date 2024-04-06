@@ -76,7 +76,9 @@ def main() -> None:
         gamma_risks = []
 
         train_len = 500
-        test_len = len(prices_train_test) - 500 - train_len
+        test_len = (
+            len(prices_train_test) - 500 - train_len
+        )  # first 500 use to initialize EWMA covariance predictions
 
         for i in parameter_dict.keys():
             sharpe_train, sharpe_test = sharpes(parameter_dict[i][-1], test_len)
