@@ -606,8 +606,8 @@ def leverages(results: BacktestResult, test_len: int) -> tuple[float, float]:
         leverage_train = results.asset_weights.abs().sum(axis=1).iloc[:-test_len].max()
         leverage_test = results.asset_weights.abs().sum(axis=1).iloc[-test_len:].max()
         return leverage_train, leverage_test
-
-    raise ValueError("test_len must be 0 or positive")
+    else
+        raise ValueError("test_len must be 0 or positive")
 
 
 def risks(results: BacktestResult, test_len: int) -> tuple[float, float]:
