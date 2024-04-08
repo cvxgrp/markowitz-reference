@@ -1,5 +1,5 @@
 clarabel==0.7.1
-contourpy==1.2.0
+contourpy==1.2.1
 cvxpy==1.4.2
 cycler==0.12.1
 ecos==2.0.13
