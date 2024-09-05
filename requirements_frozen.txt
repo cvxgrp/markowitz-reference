@@ -16,7 +16,7 @@ packaging==24.1
 pandas==2.2.1
 pillow==10.4.0
 pybind11==2.13.5
-pyparsing==3.1.2
+pyparsing==3.1.4
 python-dateutil==2.9.0.post0
 pytz==2024.1
 qdldl==0.1.7.post4
