@@ -9,7 +9,7 @@ kiwisolver==1.4.5
 loguru==0.7.2
 MarkupSafe==2.1.5
 matplotlib==3.9.2
-Mosek==10.2.3
+Mosek==10.2.4
 numpy==2.0.1
 osqp==0.6.7.post1
 packaging==24.1
