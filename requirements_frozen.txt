@@ -18,7 +18,7 @@ pillow==10.4.0
 pybind11==2.13.5
 pyparsing==3.1.4
 python-dateutil==2.9.0.post0
-pytz==2024.1
+pytz==2024.2
 qdldl==0.1.7.post4
 scipy==1.14.1
 scs==3.2.7
