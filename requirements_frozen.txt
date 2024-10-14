@@ -11,7 +11,7 @@ MarkupSafe==2.1.5
 matplotlib==3.9.2
 Mosek==10.2.5
 numpy==2.1.2
-osqp==0.6.7.post1
+osqp==0.6.7.post3
 packaging==24.1
 pandas==2.2.3
 pillow==10.4.0
