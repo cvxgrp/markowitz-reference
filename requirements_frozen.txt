@@ -7,7 +7,7 @@ fonttools==4.54.1
 Jinja2==3.1.4
 kiwisolver==1.4.7
 loguru==0.7.2
-MarkupSafe==2.1.5
+MarkupSafe==3.0.1
 matplotlib==3.9.2
 Mosek==10.2.5
 numpy==2.1.2
