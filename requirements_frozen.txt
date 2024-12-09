@@ -6,7 +6,7 @@ ecos==2.0.14
 fonttools==4.55.2
 Jinja2==3.1.4
 kiwisolver==1.4.7
-loguru==0.7.2
+loguru==0.7.3
 MarkupSafe==3.0.2
 matplotlib==3.9.3
 Mosek==10.2.11
