@@ -5,7 +5,7 @@ cycler==0.12.1
 ecos==2.0.14
 fonttools==4.55.3
 Jinja2==3.1.5
-kiwisolver==1.4.7
+kiwisolver==1.4.8
 loguru==0.7.3
 MarkupSafe==3.0.2
 matplotlib==3.10.0
