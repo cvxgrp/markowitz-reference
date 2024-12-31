@@ -1,22 +1,27 @@
 .DEFAULT_GOAL := help
 
-VENV :=.venv
+venv:
+	@curl -LsSf https://astral.sh/uv/install.sh | sh
+	@uv venv
+
 
 .PHONY: install
-install:  ## Install a virtual environment
-	python -m venv ${VENV}
-	${VENV}/bin/pip install --upgrade pip
-	${VENV}/bin/pip install -r requirements.txt
+install: venv ## Install a virtual environment
+	@uv pip install --upgrade pip
+	@uv pip install -r requirements.txt
+
+
+.PHONY: fmt
+fmt: venv ## Run autoformatting and linting
+	@uv pip install pre-commit
+	@uv run pre-commit install
+	@uv run pre-commit run --all-files
+
 
 .PHONY: freeze
 freeze: install  ## Freeze all requirements
-	${VENV}/bin/pip freeze > requirements_frozen.txt
+	@uv pip freeze > requirements_frozen.txt
 
-.PHONY: fmt
-fmt: install ## Run autoformatting and linting
-	${VENV}/bin/pip install pre-commit
-	${VENV}/bin/pre-commit install
-	${VENV}/bin/pre-commit run --all-files
 
 .PHONY: clean
 clean:  ## Clean up caches and build artifacts
@@ -24,7 +29,7 @@ clean:  ## Clean up caches and build artifacts
 
 .PHONY: experiments
 experiments: install ## Run all experiment
-	${VENV}/bin/python experiments.py
+	@uv run python experiments.py
 
 .PHONY: help
 help:  ## Display this help screen
