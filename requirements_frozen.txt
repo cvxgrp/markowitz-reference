@@ -17,7 +17,7 @@ pillow==11.1.0
 pip==25.0
 pyparsing==3.2.1
 python-dateutil==2.9.0.post0
-pytz==2024.2
+pytz==2025.1
 qdldl==0.1.7.post5
 scipy==1.15.1
 scs==3.2.7.post2
