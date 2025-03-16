@@ -40,5 +40,6 @@ If you want to reference our work in your research, please consider using the fo
       volume={50},
       number={8},
       pages={117--160},
-      year={2024},
+      year={2024}
+}
 ```
