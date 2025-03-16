@@ -40,5 +40,16 @@ If you want to reference our work in your research, please consider using the fo
       volume={50},
       number={8},
       pages={117--160},
-      year={2024}}
+      year={2024}
+}
+```
+or for the arXiv version
+```BibTeX
+@misc{boyd2024markowitz,
+      title={Markowitz Portfolio Construction at Seventy},
+      author={Stephen Boyd and Kasper Johansson and Ronald Kahn and Philipp Schiele and Thomas Schmelzer},
+      year={2024},
+      doi = {10.48550/arXiv.2401.05080},
+      url = {https://arxiv.org/abs/2401.05080}
+}
 ```
