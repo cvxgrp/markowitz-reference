@@ -43,7 +43,7 @@ If you want to reference our work in your research, please consider using the fo
       year={2024}
 }
 ```
-or for the arXiv version
+or for the arXiv version:
 ```BibTeX
 @misc{boyd2024markowitz,
       title={Markowitz Portfolio Construction at Seventy},
