@@ -40,4 +40,12 @@ If you want to reference our work in your research, please consider using the fo
       doi = {10.48550/arXiv.2401.05080},
       url = {https://arxiv.org/abs/2401.05080}
 }
+@article{boyd2024markowitz,
+      title={Markowitz Portfolio Construction at Seventy},
+      author={S. Boyd and K. Johansson and R. Kahn and P. Schiele and T. Schmelzer},
+      journal={Journal of Portfolio Management},
+      volume={50},
+      number={8},
+      pages={117--160},
+      year={2024},
 ```
