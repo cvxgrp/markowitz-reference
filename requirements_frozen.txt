@@ -13,7 +13,7 @@ numpy==2.2.4
 osqp==1.0.3
 packaging==24.2
 pandas==2.2.3
-pillow==11.1.0
+pillow==11.2.1
 pip==25.0.1
 pyparsing==3.2.3
 python-dateutil==2.9.0.post0
