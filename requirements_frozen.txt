@@ -14,7 +14,7 @@ osqp==1.0.3
 packaging==25.0
 pandas==2.2.3
 pillow==11.2.1
-pip==25.0.1
+pip==25.1
 pyparsing==3.2.3
 python-dateutil==2.9.0.post0
 pytz==2025.2
