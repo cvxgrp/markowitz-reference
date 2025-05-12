@@ -10,7 +10,7 @@ markupsafe==3.0.2
 matplotlib==3.10.1
 mosek==11.0.19
 numpy==2.2.5
-osqp==1.0.3
+osqp==1.0.4
 packaging==25.0
 pandas==2.2.3
 pillow==11.2.1
