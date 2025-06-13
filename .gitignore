@@ -9,6 +9,7 @@ figures
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
+__marimo__/
 *.py[cod]
 *$py.class
 .pytest_cache
