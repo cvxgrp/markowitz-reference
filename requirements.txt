@@ -1,5 +1,5 @@
 cvxpy==1.6.6
-numpy==2.3.0
+numpy==2.3.1
 pandas[output-formatting]==2.3.0
 matplotlib==3.10.3
 loguru==0.7.3
