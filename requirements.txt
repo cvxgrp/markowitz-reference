@@ -1,4 +1,4 @@
-cvxpy==1.6.6
+cvxpy==1.7.1
 numpy==2.3.1
 pandas[output-formatting]==2.3.1
 matplotlib==3.10.3
