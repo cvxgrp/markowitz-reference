@@ -1,0 +1,33 @@
+# GitHub Action to analyze Python project dependencies using deptry
+# This action checks for unused, missing, and transitive dependencies in a Python project
+name: 'Dependency Check'
+description: 'Run deptry to check for dependency issues including unused, missing, and transitive dependencies'
+
+on:
+  push:
+
+jobs:
+  deptry:
+    permissions:
+      contents: read
+
+    steps:
+      # Step 1: Check out the repository code
+      # This ensures we have the latest code from the specified ref
+      - name: Checkout ${{ github.repository }}
+        uses: actions/checkout@v4  # Official GitHub checkout action
+
+      # Step 2: Set up the Python environment with uv
+      # This installs the uv package manager which provides the uvx command
+      - name: Set up uv/uvx
+        uses: astral-sh/setup-uv@v6  # Official action for setting up uv
+        # Default settings are used for uv setup
+
+      # Step 3: Run deptry to analyze dependencies
+      # This executes deptry on the specified source folder with any provided options
+      - name: Run Deptry
+        shell: bash
+        run: |
+          # Run deptry using uvx (uv execute) to avoid installing it globally
+          # This will check for unused, missing, and transitive dependencies
+          uvx deptry experiments
