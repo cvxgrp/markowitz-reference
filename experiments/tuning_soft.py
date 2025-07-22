@@ -1,7 +1,7 @@
 import numpy as np
 from loguru import logger
 
-from experiments.tuning_utils import (
+from .tuning_utils import (
     HyperParameters,
     Targets,
     full_markowitz,

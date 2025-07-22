@@ -6,14 +6,14 @@ import numpy as np
 from loguru import logger
 from matplotlib import pyplot as plt
 
-from experiments.backtest import (
+from .backtest import (
     BacktestResult,
     OptimizationInput,
     Timing,
     load_data,
     run_backtest,
 )
-from experiments.utils import checkpoints_path, figures_path, get_solver
+from .utils import checkpoints_path, figures_path, get_solver
 
 
 def parameter_scaling_markowitz(
