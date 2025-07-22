@@ -4,7 +4,8 @@ import cvxpy as cp
 import numpy as np
 import pandas as pd
 from loguru import logger
-from utils import generate_random_inputs, get_solver
+
+from .utils import generate_random_inputs, get_solver
 
 
 def main(fitting: bool = False) -> None:

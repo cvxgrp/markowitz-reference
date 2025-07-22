@@ -1,8 +1,8 @@
 import numpy as np
 from loguru import logger
 
-from experiments.backtest import load_data
-from experiments.tuning_utils import (
+from .backtest import load_data
+from .tuning_utils import (
     HyperParameters,
     Targets,
     run_hard_backtest,

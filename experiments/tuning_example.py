@@ -1,8 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from backtest import load_data
-from tuning_utils import (
+
+from .backtest import load_data
+from .tuning_utils import (
     full_markowitz,
     leverages,
     risks,
@@ -11,7 +12,7 @@ from tuning_utils import (
     turnovers,
     yearly_data,
 )
-from utils import experiment_path
+from .utils import experiment_path
 
 
 def main() -> None:

@@ -7,7 +7,9 @@ from typing import Optional
 import cvxpy as cp
 import numpy as np
 import pandas as pd
-from backtest import (
+from loguru import logger
+
+from .backtest import (
     BacktestResult,
     OptimizationInput,
     Timing,
@@ -16,9 +18,8 @@ from backtest import (
     interest_and_fees,
     load_data,
 )
-from loguru import logger
-from markowitz import Data, Parameters
-from utils import synthetic_returns
+from .markowitz import Data, Parameters
+from .utils import synthetic_returns
 
 
 @dataclass
