@@ -8,6 +8,9 @@ on:
 
 jobs:
   deptry:
+
+    runs-on: ubuntu-latest
+
     permissions:
       contents: read
 
