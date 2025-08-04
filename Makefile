@@ -10,28 +10,12 @@ uv: ## Create a virtual environment using uv
 	# Download and install uv package manager
 	@curl -LsSf https://astral.sh/uv/install.sh | sh
 
-.PHONY: install
-install: uv ## Install a virtual environment
-	# Create a virtual environment
-	@uv venv
-	# Upgrade pip to the latest version
-	@uv pip install --upgrade pip
-	# Install dependencies from requirements.txt
-	@uv pip install -r requirements.txt
-
 ##@ Code Quality
 
 .PHONY: fmt
 fmt: uv ## Run autoformatting and linting
 	# Run all pre-commit hooks on all files
 	@uvx run pre-commit run --all-files
-
-##@ Dependencies
-
-.PHONY: freeze
-freeze: install  ## Freeze all requirements
-	# Create a frozen requirements file with exact versions
-	@uv pip freeze > requirements_frozen.txt
 
 ##@ Cleanup
 
@@ -43,9 +27,9 @@ clean:  ## Clean up caches and build artifacts
 ##@ Experiments
 
 .PHONY: experiments
-experiments: install ## Run all experiment
+experiments: uv ## Run all experiment
 	# Execute the experiments script
-	@uv run python experiments.py
+	@uv run experiments.py
 
 ##@ Help
 
