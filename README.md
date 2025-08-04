@@ -27,7 +27,7 @@ The script section is as of today
 
 ```python
 # /// script
-# requires-python = ">=3.11"
+# requires-python = ">=3.12"
 # dependencies = [
 #   "mosek==11.0.27",
 #   "loguru==0.7.3",
