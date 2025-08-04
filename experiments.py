@@ -1,3 +1,26 @@
+"""
+This script runs the experiments for the Markowitz reference implementation.
+
+To run this script with uv (https://github.com/astral-sh/uv):
+1. Install uv:
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+
+2. Run the experiments:
+   uv run experiments.py
+"""
+
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "mosek==11.0.27",
+#   "loguru==0.7.3",
+#   "numpy==2.3.2",
+#   "pandas[output-formatting]==2.3.1",
+#   "matplotlib==3.10.5",
+#   "cvxpy-base==1.7.1",
+#   "clarabel==0.11.1"
+# ]
+# ///
 import os
 import sys
 from pathlib import Path
