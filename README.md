@@ -17,6 +17,12 @@ This first installs uv on the fly and then creates and replicates the
 environment defined in the script section of the 'experiments.py' file
 as described in the [documentation of uv run](https://docs.astral.sh/uv/guides/scripts/#declaring-script-dependencies)
 
+If you have uv installed you can bypass make and run directly
+
+```bash
+uv run experiments.py
+```
+
 The script section is as of today
 
 ```python
