@@ -6,15 +6,14 @@
 
 ##@ Development Setup
 
-venv: ## Create a virtual environment using uv
+uv: ## Create a virtual environment using uv
 	# Download and install uv package manager
 	@curl -LsSf https://astral.sh/uv/install.sh | sh
-	# Create a virtual environment
-	@uv venv
-
 
 .PHONY: install
-install: venv ## Install a virtual environment
+install: uv ## Install a virtual environment
+	# Create a virtual environment
+	@uv venv
 	# Upgrade pip to the latest version
 	@uv pip install --upgrade pip
 	# Install dependencies from requirements.txt
@@ -23,13 +22,9 @@ install: venv ## Install a virtual environment
 ##@ Code Quality
 
 .PHONY: fmt
-fmt: venv ## Run autoformatting and linting
-	# Install pre-commit for managing git hooks
-	@uv pip install pre-commit
-	# Install pre-commit hooks in the git repository
-	@uv run pre-commit install
+fmt: uv ## Run autoformatting and linting
 	# Run all pre-commit hooks on all files
-	@uv run pre-commit run --all-files
+	@uvx run pre-commit run --all-files
 
 ##@ Dependencies
 
