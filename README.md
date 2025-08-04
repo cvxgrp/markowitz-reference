@@ -13,18 +13,29 @@ Please run all experiments using
 make experiments
 ```
 
-This first replicates the virtual environment defined in 'requirements.txt'
-locally and then runs the experiments defined in 'experiments.py'.
+This first installs uv on the fly and then creates and replicates the
+environment defined in the script section of the 'experiments.py' file
+as described in the [documentation of uv run](https://docs.astral.sh/uv/guides/scripts/#declaring-script-dependencies)
 
-## Reproducibility
+The script section is as of today
 
-The main packages used are specified in 'requirements.txt', with a frozen
-version of all packages and their sub-dependencies in 'requirements_frozen.txt'.
-We used Python 3.10.13 to run the experiments.
+```python
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "mosek==11.0.27",
+#   "loguru==0.7.3",
+#   "numpy==2.3.2",
+#   "pandas[output-formatting]==2.3.1",
+#   "matplotlib==3.10.5",
+#   "cvxpy-base==1.7.1",
+#   "clarabel==0.11.1"
+# ]
+# ///
+```
 
 A large fraction of our experiments have been performed
 using [MOSEK](https://www.mosek.com/) as the underlying solver.
-A recent version of it is listed in 'requirements.txt'.
 We assume a valid license for MOSEK is installed. If not,
 you may want to apply for a [Trial License](https://www.mosek.com/try/)
 
