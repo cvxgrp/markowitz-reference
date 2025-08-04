@@ -10,7 +10,7 @@ To run this script with uv (https://github.com/astral-sh/uv):
 """
 
 # /// script
-# requires-python = ">=3.11"
+# requires-python = ">=3.12"
 # dependencies = [
 #   "mosek==11.0.27",
 #   "loguru==0.7.3",
